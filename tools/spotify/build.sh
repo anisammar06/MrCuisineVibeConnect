@@ -16,6 +16,10 @@ git clone --depth 1 --branch "$VERSION" https://github.com/devgianlu/go-librespo
 git clone https://github.com/microsoft/vcpkg vcpkg
 ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
 cd src
+# Spotify refuse le jeton client « Android » sans données d'appareil (erreur 400) : le programme
+# se présente comme un Linux ARM, comme go-librespot sur un Raspberry Pi.
+sed -i 's/runtime\.GOOS/"linux"/g' platform.go
+grep -n '"linux"' platform.go | head -3
 # Bibliothèques de décodage (ogg/vorbis, flac, mpg123) en statique pour Android ARM ; pas d'ALSA sur Android.
 "$W/vcpkg/vcpkg" install --triplet arm-neon-android --x-install-root="$W/inst" || {
   for f in "$W"/vcpkg/buildtrees/*/*.log; do echo "=== $f"; tail -n 40 "$f"; done
