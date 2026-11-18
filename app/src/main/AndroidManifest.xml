@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Bouton « Retour à Toque » par-dessus l'appli d'origine (le robot n'a pas de bouton Accueil). -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Spotify Connect : le robot s'annonce sur le Wi-Fi (mDNS). -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
     <application
         android:name=".ToqueApp"
@@ -60,6 +63,11 @@
             android:exported="false" />
 
         <!-- Sonnerie des minuteurs de cuisine (par-dessus toutes les applis). -->
+        <!-- Enceinte Spotify Connect (go-librespot) -->
+        <service
+            android:name=".media.SpotifyService"
+            android:exported="false" />
+
         <service
             android:name=".kitchen.TimerRing"
             android:exported="false" />

@@ -301,6 +301,20 @@ class Prefs(context: Context) {
             p.edit().putInt("guidedStep", v).commit()
         }
 
+    /** Enceinte Spotify Connect sur le robot. */
+    var spotifyEnabled: Boolean
+        get() = p.getBoolean("spotifyEnabled", true)
+        set(v) {
+            p.edit().putBoolean("spotifyEnabled", v).commit()
+        }
+
+    /** Nom de l'enceinte dans l'appli Spotify. */
+    var spotifyName: String
+        get() = p.getString("spotifyName", "Gotuj z Kasią") ?: "Gotuj z Kasią"
+        set(v) {
+            p.edit().putString("spotifyName", v).commit()
+        }
+
     /** Version du rangement des recettes Cookidoo (2 : par langue de la recette). */
     var cookidooSchema: Int
         get() = p.getInt("cookidooSchema", 0)

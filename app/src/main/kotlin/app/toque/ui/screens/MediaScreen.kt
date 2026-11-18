@@ -49,8 +49,18 @@ class MediaScreen(a: MainActivity) : Screen(a) {
         yt.addView(head2, Ui.lp(b = 8))
         yt.addView(Ui.text(c, tr("Vidéos de cuisine et abonnements, par NewPipe."), 15f, Ui.TEXT2))
         yt.addView(Ui.button(c, tr("Ouvrir NewPipe"), Ui.Style.PRIMARY, Icon.Kind.PLAY, height = 54) { openNewPipe() }, Ui.lp(Ui.WRAP, Ui.WRAP, t = 12))
-        left.addView(yt)
-        root.addView(left, LinearLayout.LayoutParams(0, Ui.WRAP, 0.42f).apply { rightMargin = Ui.u(18) })
+        left.addView(yt, Ui.lp(b = 14))
+
+        val sp = Ui.card(c, 24f)
+        val head3 = Ui.horizontal(c)
+        head3.addView(Icon(c, Icon.Kind.PLAY, 0xFF1DB954.toInt()), LinearLayout.LayoutParams(Ui.u(24), Ui.u(24)).apply { rightMargin = Ui.u(10) })
+        head3.addView(Ui.text(c, "Spotify", 20f, Ui.TEXT, Ui.MEDIUM))
+        sp.addView(head3, Ui.lp(b = 8))
+        sp.addView(Ui.text(c, tr("Le robot est une enceinte Spotify : choisissez « %s » dans l'appli Spotify du téléphone.", a.prefs.spotifyName),
+            15f, Ui.TEXT2).apply { setLineSpacing(0f, 1.15f) })
+        sp.addView(Ui.button(c, tr("Ouvrir Spotify"), Ui.Style.PRIMARY, Icon.Kind.PLAY, height = 54) { a.push(SpotifyScreen(a)) }, Ui.lp(Ui.WRAP, Ui.WRAP, t = 12))
+        left.addView(sp)
+        root.addView(Ui.scroll(c, left), LinearLayout.LayoutParams(0, Ui.MATCH, 0.42f).apply { rightMargin = Ui.u(18) })
 
         // Colonne droite : fichiers reçus.
         val right = Ui.vertical(c)

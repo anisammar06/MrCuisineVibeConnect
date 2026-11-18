@@ -48,6 +48,11 @@ android {
 
     sourceSets["main"].java.srcDirs("src/main/kotlin")
 
+    // Le programme Spotify (libgolibrespot.so) doit être extrait sur le disque pour être lancé.
+    packaging {
+        jniLibs { useLegacyPackaging = true }
+    }
+
     lint {
         abortOnError = false
         checkReleaseBuilds = false

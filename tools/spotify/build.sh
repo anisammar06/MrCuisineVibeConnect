@@ -17,11 +17,11 @@ git clone https://github.com/microsoft/vcpkg vcpkg
 ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
 cd src
 # Bibliothèques de décodage (ogg/vorbis, flac, mpg123) en statique pour Android ARM ; pas d'ALSA sur Android.
-"$W/vcpkg/vcpkg" install --triplet arm-android --x-install-root="$W/inst" || {
+"$W/vcpkg/vcpkg" install --triplet arm-neon-android --x-install-root="$W/inst" || {
   for f in "$W"/vcpkg/buildtrees/*/*.log; do echo "=== $f"; tail -n 40 "$f"; done
   exit 1
 }
-P="$W/inst/arm-android"
+P="$W/inst/arm-neon-android"
 ls "$P/lib" "$P/lib/pkgconfig"
 export CGO_ENABLED=1 GOOS=android GOARCH=arm GOARM=7
 export CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi23-clang"

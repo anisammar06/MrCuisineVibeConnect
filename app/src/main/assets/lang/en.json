@@ -546,5 +546,22 @@
   "Import impossible : %s": "Import failed: %s",
   "Connexion Cookidoo refusée": "Cookidoo sign-in refused",
   "Recette Cookidoo illisible": "Unreadable Cookidoo recipe",
-  "%d recettes de vos listes (%d nouvelles)": "%d recipes from your lists (%d new)"
+  "%d recettes de vos listes (%d nouvelles)": "%d recipes from your lists (%d new)",
+  "Délier": "Unlink",
+  "Délier le compte Spotify ?": "Unlink the Spotify account?",
+  "Spotify désactivé": "Spotify turned off",
+  "Ouvrir Spotify": "Open Spotify",
+  "Prêt à jouer": "Ready to play",
+  "Démarrage de Spotify…": "Starting Spotify…",
+  "Il faudra refaire l'appairage avec un code.": "You will have to pair again with a code.",
+  "Spotify": "Spotify",
+  "Le robot est une enceinte Spotify : choisissez « %s » dans l'appli Spotify du téléphone.": "The robot is a Spotify speaker: pick “%s” in the Spotify app on the phone.",
+  "Délier le compte Spotify": "Unlink the Spotify account",
+  "Dans l'appli Spotify du téléphone, touchez l'icône des appareils et choisissez « %s ». Le son sort du robot.": "In the Spotify app on the phone, tap the devices icon and pick “%s”. The sound comes out of the robot.",
+  "Enceinte Spotify sur le robot": "Spotify speaker on the robot",
+  "Réglages › Spotify › Enceinte Spotify sur le robot.": "Settings › Spotify › Spotify speaker on the robot.",
+  "Compte Spotify délié": "Spotify account unlinked",
+  "Le robot apparaît comme enceinte « %s » dans l'appli Spotify (compte Premium). Premier appairage : Médias › Spotify.": "The robot shows up as the “%s” speaker in the Spotify app (Premium account). First pairing: Media › Spotify.",
+  "Première fois : scannez le code avec le téléphone, ou allez sur spotify.com/pair et saisissez :": "First time: scan the code with the phone, or go to spotify.com/pair and enter:",
+  "Volume %d %%": "Volume %d %%"
 }

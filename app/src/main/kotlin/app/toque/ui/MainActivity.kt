@@ -1,5 +1,6 @@
 package app.toque.ui
 
+import app.toque.media.SpotifyService
 import app.toque.recipes.CookidooClient
 import app.toque.recipes.CookidooSync
 import app.toque.kitchen.Timers
@@ -100,6 +101,7 @@ class MainActivity : Activity() {
             Thread { CookidooSync.run(applicationContext) }.start()
         }
         ReceiverService.start(this)
+        SpotifyService.start(applicationContext)
         SyncService.schedule(this)
         push(HomeScreen(this))
         if (reopenSettings) {

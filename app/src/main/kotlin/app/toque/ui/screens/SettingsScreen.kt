@@ -28,6 +28,7 @@ import app.toque.recipes.CookidooProgress
 import app.toque.recipes.CookidooSync
 import app.toque.media.Received
 import app.toque.media.ReceiverService
+import app.toque.media.SpotifyService
 import app.toque.ui.Icon
 import app.toque.ui.MainActivity
 import app.toque.ui.Screen
@@ -211,6 +212,21 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
             14f, Ui.TEXT3).apply { setLineSpacing(0f, 1.1f) }, Ui.lp(t = 10))
         tm.addView(tmActions)
         renderCookidoo()
+
+        // ---- Spotify
+        val sp = section(right, tr("Spotify"), Icon.Kind.PLAY)
+        sp.addView(Ui.text(c, tr("Le robot apparaît comme enceinte « %s » dans l'appli Spotify (compte Premium). Premier appairage : Médias › Spotify.", a.prefs.spotifyName),
+            15f, Ui.TEXT2).apply { setLineSpacing(0f, 1.15f) })
+        sp.addView(toggle(tr("Enceinte Spotify sur le robot"), a.prefs.spotifyEnabled) { on ->
+            a.prefs.spotifyEnabled = on
+            if (on) SpotifyService.start(a) else SpotifyService.stop(a)
+        }, Ui.lp(t = 10))
+        sp.addView(Ui.button(c, tr("Délier le compte Spotify"), Ui.Style.GHOST, height = 52) {
+            a.confirm(tr("Délier le compte Spotify ?"), tr("Il faudra refaire l'appairage avec un code."), tr("Délier"), danger = true) {
+                SpotifyService.unlink(a.applicationContext)
+                a.toast(tr("Compte Spotify délié"), Ui.OK)
+            }
+        }, Ui.lp(Ui.WRAP, Ui.WRAP, t = 10))
 
         // ---- Réception (Médias)
         val recv = section(left, tr("Réception depuis le téléphone"), Icon.Kind.LINK)

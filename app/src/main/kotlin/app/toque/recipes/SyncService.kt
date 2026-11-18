@@ -50,6 +50,7 @@ class BootReceiver : BroadcastReceiver() {
         c.startService(Intent(c, MachineService::class.java))
         ReceiverService.start(c)
         app.toque.kitchen.Timers.restore(c)
+        app.toque.media.SpotifyService.start(c)
         if (Prefs(c).bootLaunch) {
             // Le robot n'a pas de bouton Accueil : Toque s'ouvre tout seul au démarrage, puis repasse
             // devant 20 s plus tard au cas où l'appli d'origine (écran d'accueil) se serait ouverte après lui.

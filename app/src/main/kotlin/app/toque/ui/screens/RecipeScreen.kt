@@ -67,14 +67,16 @@ class RecipeScreen(a: MainActivity, private val recipe: Recipe, private val repo
         favLabel = Ui.text(c, "", 18f, Ui.TEXT, Ui.MEDIUM)
         fav.addView(favLabel, LinearLayout.LayoutParams(Ui.WRAP, Ui.WRAP).apply { leftMargin = Ui.u(8) })
         actions.addView(fav)
-        if (recipe.allIngredients.isNotEmpty()) {
-            actions.addView(Ui.button(c, tr("Courses"), Ui.Style.SECONDARY, Icon.Kind.CHECK, height = 66, textSize = 18f) { askShopping() },
-                Ui.lp(Ui.WRAP, Ui.WRAP, l = 10))
-        }
         left.addView(actions, Ui.lp(t = 14))
 
         val ing = Ui.vertical(c)
-        ing.addView(section(tr("Ingrédients")))
+        val ingHead = Ui.horizontal(c)
+        ingHead.addView(section(tr("Ingrédients")), LinearLayout.LayoutParams(0, Ui.WRAP, 1f))
+        if (recipe.allIngredients.isNotEmpty()) {
+            ingHead.addView(Ui.button(c, tr("Courses"), Ui.Style.GHOST, Icon.Kind.PLUS, height = 44, textSize = 15f) { askShopping() },
+                Ui.lp(Ui.WRAP, Ui.WRAP, t = 6))
+        }
+        ing.addView(ingHead)
         for (g in recipe.ingredients) {
             if (g.title.isNotBlank()) ing.addView(Ui.text(c, g.title, 17f, Ui.ACCENT, Ui.MEDIUM), Ui.lp(t = 12, b = 2))
             for (i in g.items) {
