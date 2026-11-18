@@ -143,7 +143,7 @@ class CookidooSearchScreen(a: MainActivity, private val initial: String = "") : 
             }
             view.post {
                 busy = false
-                result.onSuccess { a.push(RecipeScreen(a, it, repo)) }
+                result.onSuccess { (r, cat) -> a.push(RecipeScreen(a, r, a.app.tm(cat))) }
                 result.onFailure { a.toast(tr("Import impossible : %s", it.message ?: it.toString()), Ui.WARN) }
             }
         }.start()

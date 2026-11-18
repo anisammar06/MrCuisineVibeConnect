@@ -1,5 +1,7 @@
 package app.toque.ui
 
+import app.toque.recipes.CookidooClient
+import app.toque.recipes.CookidooSync
 import app.toque.kitchen.Timers
 import app.toque.media.ReceiverService
 import android.app.Activity
@@ -93,6 +95,10 @@ class MainActivity : Activity() {
         app.recipesPl.load()
         app.tmFr.load()
         app.tmPl.load()
+        // Après la mise à jour qui range les recettes Cookidoo par langue : resynchro automatique.
+        if (prefs.cookidooSchema < 2 && CookidooClient(this).loggedIn) {
+            Thread { CookidooSync.run(applicationContext) }.start()
+        }
         ReceiverService.start(this)
         SyncService.schedule(this)
         push(HomeScreen(this))

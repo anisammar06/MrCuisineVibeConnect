@@ -301,6 +301,13 @@ class Prefs(context: Context) {
             p.edit().putInt("guidedStep", v).commit()
         }
 
+    /** Version du rangement des recettes Cookidoo (2 : par langue de la recette). */
+    var cookidooSchema: Int
+        get() = p.getInt("cookidooSchema", 0)
+        set(v) {
+            p.edit().putInt("cookidooSchema", v).commit()
+        }
+
     /** Page de recherche Cookidoo où reprendre l'ajout progressif du catalogue. */
     fun cookidooPage(lang: String): Int = p.getInt("cookidooPage_$lang", 0)
     fun setCookidooPage(lang: String, page: Int) {

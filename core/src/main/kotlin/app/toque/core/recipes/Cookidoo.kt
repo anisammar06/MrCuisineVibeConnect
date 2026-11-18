@@ -34,7 +34,8 @@ object Cookidoo {
     fun imageUrl(template: String, small: Boolean = false): String =
         template.replace("{transformation}", if (small) "t_web_shared_recipe_221x240" else "t_web_rdp_recipe_584x480_1_5x")
 
-    class Parsed(val recipe: Recipe, val imageUrl: String?)
+    /** [language] : langue de la recette selon Cookidoo (« pl », « fr »…), vide si inconnue. */
+    class Parsed(val recipe: Recipe, val imageUrl: String?, val language: String = "")
     class Hit(val id: String, val title: String, val totalMinutes: Int, val imageUrl: String?)
     class SearchPage(val hits: List<Hit>, val total: Int)
     class Collection(val id: String, val title: String, val recipeIds: List<String>)
@@ -132,7 +133,7 @@ object Cookidoo {
             notes = tips.joinToString("\n\n"),
             author = "Cookidoo",
         )
-        return Parsed(recipe, image?.let { imageUrl(it) })
+        return Parsed(recipe, image?.let { imageUrl(it) }, m.str("language")?.lowercase()?.substringBefore('-').orEmpty())
     }
 
     private fun num(v: Double): String =

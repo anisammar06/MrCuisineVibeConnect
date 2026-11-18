@@ -47,16 +47,24 @@ object CookidooSync {
 
     fun langs(app: ToqueApp): List<String> = if (app.prefs.cookidooPolish) listOf("fr", "pl") else listOf("fr")
 
-    /** Importe une recette (recherche à la demande) ; renvoie la recette convertie. */
-    fun importOne(c: Context, lang: String, id: String): Recipe {
-        val app = ToqueApp.of(c)
-        val client = CookidooClient(c)
-        val r = fetch(c, client, lang, id) ?: throw java.io.IOException(tr("Recette Cookidoo illisible"))
-        app.tm(lang).upsertAll(listOf(r))
-        return r
+    /** Catalogue où ranger une recette : celui de sa langue (une recette polonaise va dans PL). */
+    fun catalogOf(parsed: Cookidoo.Parsed, asked: String): String = when (parsed.language) {
+        "pl" -> "pl"
+        "fr" -> "fr"
+        else -> asked
     }
 
-    private fun fetch(c: Context, client: CookidooClient, lang: String, id: String): Recipe? {
+    /** Importe une recette (recherche à la demande) ; renvoie la recette convertie et son catalogue. */
+    fun importOne(c: Context, lang: String, id: String): Pair<Recipe, String> {
+        val app = ToqueApp.of(c)
+        val client = CookidooClient(c)
+        val p = fetch(c, client, lang, id) ?: throw java.io.IOException(tr("Recette Cookidoo illisible"))
+        val l = catalogOf(p, lang)
+        app.tm(l).upsertAll(listOf(p.recipe))
+        return p.recipe to l
+    }
+
+    private fun fetch(c: Context, client: CookidooClient, lang: String, id: String): Cookidoo.Parsed? {
         val parsed = Cookidoo.parseRecipe(client.recipe(lang, id)) ?: return null
         parsed.imageUrl?.let { url ->
             val repo = ToqueApp.of(c).tm(lang)
@@ -69,7 +77,7 @@ object CookidooSync {
             } catch (_: Exception) {
             }
         }
-        return parsed.recipe
+        return parsed
     }
 
     fun run(c: Context) {
@@ -82,6 +90,11 @@ object CookidooSync {
             if (!client.loggedIn) {
                 lines += tr("Compte Cookidoo non connecté")
                 return
+            }
+            // 0.9.0 rangeait tout en français : on refait le tri par langue une fois.
+            if (app.prefs.cookidooSchema < 2) {
+                for (l in listOf("fr", "pl")) app.tm(l).removeAllExcept(emptySet())
+                app.prefs.cookidooSchema = 2
             }
             CookidooProgress.update(true, tr("Cookidoo : lecture de vos listes…"))
             // 1. Listes du compte (identiques quelle que soit la langue du site).
@@ -120,10 +133,13 @@ object CookidooSync {
                     }
                     Thread.sleep(PAUSE_MS)
                     if (r != null) {
-                        app.tm(l).upsertAll(listOf(r), rebuild = false)
-                        app.tm(l).addFavorites(listOf(r.id))
-                        known[id] = l
+                        val cat = catalogOf(r, l)
+                        app.tm(cat).upsertAll(listOf(r.recipe), rebuild = false)
+                        app.tm(cat).addFavorites(listOf(r.recipe.id))
+                        known[id] = cat
                         fromLists++
+                        // Les recettes apparaissent au fur et à mesure dans Toque.
+                        if (fromLists % 20 == 0) for (x in listOf("fr", "pl")) app.tm(x).refresh()
                         done = true
                         break
                     }
@@ -157,10 +173,11 @@ object CookidooSync {
                         }
                         Thread.sleep(PAUSE_MS)
                         if (r == null) continue
-                        app.tm(l).upsertAll(listOf(r), rebuild = false)
-                        known[h.id] = l
+                        val cat = catalogOf(r, l)
+                        app.tm(cat).upsertAll(listOf(r.recipe), rebuild = false)
+                        known[h.id] = cat
                         added++
-                        if (added % 25 == 0) app.tm(l).refresh()
+                        if (added % 20 == 0) app.tm(cat).refresh()
                     }
                     page++
                     app.prefs.setCookidooPage(l, page)
