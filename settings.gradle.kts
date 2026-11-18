@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "Toque"
-include(":core", ":app")
+include(":core", ":app", ":companion")

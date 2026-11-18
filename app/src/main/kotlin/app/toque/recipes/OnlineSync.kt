@@ -258,11 +258,20 @@ class OnlineSync(private val context: Context, private val prefs: Prefs, private
         fun syncAll(context: Context, app: app.toque.ToqueApp, progress: (String) -> Unit = {}): LidlSync.Report {
             var last: LidlSync.Report? = null
             var total = 0
-            for (l in app.syncLangs()) {
-                val r = OnlineSync(context, app.prefs, app.repo(l), app.log).sync { msg -> progress(l.uppercase() + " · " + msg) }
-                if (!r.ok) return r
-                total += r.recipes
-                last = r
+            try {
+                for (l in app.syncLangs()) {
+                    val r = OnlineSync(context, app.prefs, app.repo(l), app.log).sync { msg ->
+                        val line = l.uppercase() + " · " + msg
+                        SyncProgress.update(true, line)
+                        progress(line)
+                    }
+                    app.repo(l).refresh()
+                    if (!r.ok) return r
+                    total += r.recipes
+                    last = r
+                }
+            } finally {
+                SyncProgress.update(false, "")
             }
             return if (app.syncLangs().size > 1) LidlSync.Report(true, tr("%d recettes Lidl à jour (FR + PL)", total), total)
             else last ?: LidlSync.Report(false, tr("Aucune langue à synchroniser"))

@@ -45,7 +45,9 @@ object Releases {
         val tag = o["tag_name"] as? String ?: throw IllegalArgumentException("version sans numéro")
         @Suppress("UNCHECKED_CAST")
         val assets = (o["assets"] as? List<Any?>).orEmpty().mapNotNull { it as? Map<String, Any?> }
-        val apk = assets.firstOrNull { (it["name"] as? String)?.endsWith(".apk", ignoreCase = true) == true }
+        // L'APK de Toque d'abord (une version peut aussi contenir l'appli compagnon du téléphone).
+        val apks = assets.filter { (it["name"] as? String)?.endsWith(".apk", ignoreCase = true) == true }
+        val apk = apks.firstOrNull { (it["name"] as? String)?.startsWith("Toque", ignoreCase = true) == true } ?: apks.firstOrNull()
         return Release(
             tag = tag,
             version = versionOf(tag),

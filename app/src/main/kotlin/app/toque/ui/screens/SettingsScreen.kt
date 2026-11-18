@@ -22,6 +22,9 @@ import app.toque.core.time.ZoneLookup
 import app.toque.core.update.Release
 import app.toque.recipes.LidlSync
 import app.toque.recipes.OnlineSync
+import app.toque.recipes.SyncProgress
+import app.toque.media.Received
+import app.toque.media.ReceiverService
 import app.toque.ui.Icon
 import app.toque.ui.MainActivity
 import app.toque.ui.Screen
@@ -35,6 +38,8 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
     private lateinit var host: EditText
     private lateinit var port: EditText
     private lateinit var syncText: TextView
+    private lateinit var recvText: TextView
+    private var unsubProgress: (() -> Unit)? = null
     private lateinit var bowlText: TextView
     private lateinit var linkText: TextView
     private lateinit var timeText: TextView
@@ -140,6 +145,28 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         }, Ui.lp(t = 10))
         lidl.addView(Ui.text(c, tr("Sur l'écran Recettes, le bouton FR | PL passe d'un catalogue à l'autre. La première synchro polonaise prend environ 15 minutes."),
             14f, Ui.TEXT3).apply { setLineSpacing(0f, 1.1f) }, Ui.lp(t = 6))
+
+        // ---- Réception (Médias)
+        val recv = section(left, tr("Réception depuis le téléphone"), Icon.Kind.LINK)
+        recv.addView(Ui.text(c, tr("Appli « Gotuj Send » sur le téléphone, puis Partager › Gotuj z Kasią."),
+            15f, Ui.TEXT2).apply { setLineSpacing(0f, 1.1f) })
+        recv.addView(toggle(tr("Recevoir les envois du téléphone"), a.prefs.receiverEnabled) { on ->
+            a.prefs.receiverEnabled = on
+            if (on) ReceiverService.start(a) else ReceiverService.stop(a)
+            renderReceiver()
+        }, Ui.lp(t = 10))
+        recvText = Ui.text(c, "", 17f, Ui.TEXT).apply { setLineSpacing(0f, 1.2f) }
+        recv.addView(recvText, Ui.lp(t = 10))
+        recv.addView(Ui.button(c, tr("Nouveau code"), Ui.Style.SECONDARY, Icon.Kind.SYNC, height = 52) {
+            a.prefs.newReceiverCode()
+            renderReceiver()
+            a.toast(tr("Nouveau code : à saisir à nouveau sur les téléphones"), Ui.OK)
+        }, Ui.lp(Ui.WRAP, Ui.WRAP, t = 10))
+        recv.addView(Ui.text(c, tr("Place maximale pour les fichiers reçus"), 16f, Ui.TEXT2), Ui.lp(t = 12))
+        val sizes = listOf(512, 1024, 2048, 4096).map { it.toString() to if (it < 1024) "$it Mo" else "${it / 1024} Go" }
+        recv.addView(dropdown(sizes, a.prefs.receivedMaxMb.toString()) { v -> a.prefs.receivedMaxMb = v.toInt() },
+            Ui.lp(Ui.MATCH, Ui.u(58), t = 6))
+        renderReceiver()
 
         // ---- Mises à jour
         val updates = section(left, tr("Mises à jour"), Icon.Kind.INFO)
@@ -379,6 +406,13 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         }.start()
     }
 
+    private fun renderReceiver() {
+        val ip = Received.localIp()
+        recvText.text = if (!a.prefs.receiverEnabled) tr("Réception désactivée.")
+        else tr("Code d'appairage : %s", a.prefs.receiverCode) + "\n" +
+            tr("Adresse du robot : %s", if (ip.isEmpty()) tr("pas de Wi-Fi") else "$ip:${ReceiverService.PORT}")
+    }
+
     private fun refreshSync() {
         val last = a.prefs.lastSyncResult
         syncText.text = (if (last.isEmpty()) tr("Jamais synchronisé") else tr("Dernières synchros :") + "\n" + last) +
@@ -489,7 +523,16 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
     override fun onShow() {
         mode = a.prefs.mode
         renderModes()
+        renderReceiver()
         if (!syncing) refreshSync()
+        // Synchro lancée ailleurs (nuit, autre écran) : son avancement s'affiche ici aussi.
+        unsubProgress = SyncProgress.onChange { if (SyncProgress.running) syncText.text = SyncProgress.text else if (!syncing) refreshSync() }
+        if (SyncProgress.running) syncText.text = SyncProgress.text
+    }
+
+    override fun onHide() {
+        unsubProgress?.invoke()
+        unsubProgress = null
     }
 
     override fun onSnapshot(s: Snapshot) {

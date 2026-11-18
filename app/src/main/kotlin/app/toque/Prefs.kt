@@ -53,6 +53,33 @@ class Prefs(context: Context) {
             p.edit().putBoolean("syncPolish", v).commit()
         }
 
+    /** Réception des contenus envoyés depuis le téléphone (appli « Gotuj Send »). */
+    var receiverEnabled: Boolean
+        get() = p.getBoolean("receiverEnabled", true)
+        set(v) {
+            p.edit().putBoolean("receiverEnabled", v).commit()
+        }
+
+    /** Code d'appairage à 6 chiffres, tiré au hasard la première fois. */
+    var receiverCode: String
+        get() = p.getString("receiverCode", null) ?: newReceiverCode()
+        set(v) {
+            p.edit().putString("receiverCode", v).commit()
+        }
+
+    fun newReceiverCode(): String {
+        val code = String.format(java.util.Locale.US, "%06d", java.security.SecureRandom().nextInt(1_000_000))
+        p.edit().putString("receiverCode", code).commit()
+        return code
+    }
+
+    /** Place maximale du dossier des fichiers reçus, en Mo (les plus anciens sont effacés). */
+    var receivedMaxMb: Int
+        get() = p.getInt("receivedMaxMb", 2048)
+        set(v) {
+            p.edit().putInt("receivedMaxMb", v).commit()
+        }
+
     var twinHost: String
         get() = p.getString("twinHost", "127.0.0.1") ?: "127.0.0.1"
         set(v) {

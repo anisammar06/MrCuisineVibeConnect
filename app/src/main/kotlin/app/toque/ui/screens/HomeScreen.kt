@@ -6,6 +6,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import app.toque.core.i18n.I18n
 import app.toque.core.i18n.tr
+import app.toque.recipes.SyncProgress
 import app.toque.ui.Icon
 import app.toque.ui.MainActivity
 import app.toque.ui.Screen
@@ -77,7 +78,7 @@ class HomeScreen(a: MainActivity) : Screen(a) {
         val (t5, s5) = tile(Icon.Kind.STAR, tr("Favoris")) { a.push(RecipesScreen(a, favorites = true)) }
         favSub = s5
         rows[1].addView(t5, tileLp(true))
-        rows[1].addView(soon(Icon.Kind.PLAY, tr("Médias"), tr("Vidéos, musique, partage")), tileLp(false))
+        rows[1].addView(tile(Icon.Kind.PLAY, tr("Médias"), tr("Vidéos, musique, partage")) { a.push(MediaScreen(a)) }.first, tileLp(false))
         rows[2].addView(soon(Icon.Kind.BOOK, tr("Recettes Thermomix"), tr("Cookidoo converti")), tileLp(true))
         rows[2].addView(soon(Icon.Kind.CHECK, tr("Liste de courses"), tr("Depuis les recettes")), tileLp(true))
         rows[2].addView(soon(Icon.Kind.TIMER, tr("Minuteurs"), tr("Plusieurs à la fois")), tileLp(false))
@@ -127,6 +128,7 @@ class HomeScreen(a: MainActivity) : Screen(a) {
         val repo = a.app.recipes
         val n = repo.count
         recipesSub.text = when {
+            SyncProgress.running -> SyncProgress.text
             !repo.loaded -> tr("Chargement…")
             n == 0 -> tr("Aucune recette Lidl pour l'instant")
             a.app.recipesPl.count > 0 -> tr("%d FR · %d PL", a.app.recipesFr.count, a.app.recipesPl.count)
@@ -143,7 +145,9 @@ class HomeScreen(a: MainActivity) : Screen(a) {
     override fun onShow() {
         refreshClock()
         refresh()
-        unsub = a.app.recipes.onChange { refresh() }
+        val u1 = a.app.recipes.onChange { refresh() }
+        val u2 = SyncProgress.onChange { refresh() }
+        unsub = { u1(); u2() }
         view.removeCallbacks(tick)
         view.postDelayed(tick, 10_000)
     }

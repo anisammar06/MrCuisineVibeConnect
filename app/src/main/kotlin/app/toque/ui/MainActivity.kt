@@ -88,6 +88,7 @@ class MainActivity : Activity() {
         app.machine.connect()
         app.recipesFr.load()
         app.recipesPl.load()
+        app.toque.media.ReceiverService.start(this)
         SyncService.schedule(this)
         push(HomeScreen(this))
         if (reopenSettings) {

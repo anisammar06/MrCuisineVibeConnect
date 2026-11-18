@@ -50,6 +50,15 @@
             android:process=":machine"
             android:stopWithTask="false" />
 
+        <!-- Réception des envois du téléphone (appli « Gotuj Send ») et lecteur flottant. -->
+        <service
+            android:name=".media.ReceiverService"
+            android:exported="false" />
+
+        <service
+            android:name=".media.MiniPlayer"
+            android:exported="false" />
+
         <service
             android:name=".recipes.SyncService"
             android:exported="false" />
