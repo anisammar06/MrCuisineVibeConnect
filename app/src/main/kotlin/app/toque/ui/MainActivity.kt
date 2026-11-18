@@ -1,5 +1,6 @@
 package app.toque.ui
 
+import app.toque.kitchen.Timers
 import app.toque.media.ReceiverService
 import android.app.Activity
 import android.content.Intent
@@ -114,7 +115,7 @@ class MainActivity : Activity() {
             stack.lastOrNull()?.onSnapshot(s)
         }
         unsubscribeEvents = app.machine.onEvent { e -> onMachineEvent(e) }
-        unsubscribeTimers = app.toque.kitchen.Timers.onChange { topBar.updateTimers() }
+        unsubscribeTimers = Timers.onChange { topBar.updateTimers() }
         topBar.updateTimers()
         topBar.startClock()
     }
