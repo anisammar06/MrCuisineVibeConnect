@@ -1,5 +1,6 @@
 package app.toque.ui
 
+import app.toque.media.ReceiverService
 import android.app.Activity
 import android.content.Intent
 import android.media.AudioManager
@@ -88,7 +89,7 @@ class MainActivity : Activity() {
         app.machine.connect()
         app.recipesFr.load()
         app.recipesPl.load()
-        app.toque.media.ReceiverService.start(this)
+        ReceiverService.start(this)
         SyncService.schedule(this)
         push(HomeScreen(this))
         if (reopenSettings) {
