@@ -40,6 +40,23 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - uses: actions/setup-go@v5
+        if: steps.version.outputs.publish == 'true'
+        with:
+          go-version: "1.25.5"
+          cache: false
+
+      # Programme Spotify Connect (go-librespot) pour le robot, compilé une fois puis gardé en cache.
+      - uses: actions/cache@v4
+        if: steps.version.outputs.publish == 'true'
+        with:
+          path: app/src/main/jniLibs/armeabi-v7a/libgolibrespot.so
+          key: golibrespot-${{ hashFiles('tools/spotify/build.sh') }}
+
+      - name: Spotify Connect pour Android
+        if: steps.version.outputs.publish == 'true'
+        run: tools/spotify/build.sh
+
       - name: Tests and build
         if: steps.version.outputs.publish == 'true'
         run: ./gradlew --no-daemon :core:test :app:assembleRelease :companion:assembleRelease
