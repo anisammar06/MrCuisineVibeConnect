@@ -31,9 +31,9 @@ export PKG_CONFIG_PATH="$P/lib/pkgconfig" PKG_CONFIG_LIBDIR="$P/lib/pkgconfig"
 cat > "$W/compat.c" <<'C'
 #include <stdio.h>
 #include <unistd.h>
-int fseeko64(FILE *f, long long off, int whence) { return fseek(f, (long) off, whence); }
-long long ftello64(FILE *f) { return (long long) ftell(f); }
-ssize_t __write_chk(int fd, const void *buf, size_t count, size_t buf_size) { (void) buf_size; return write(fd, buf, count); }
+__attribute__((weak)) int fseeko64(FILE *f, long long off, int whence) { return fseek(f, (long) off, whence); }
+__attribute__((weak)) long long ftello64(FILE *f) { return (long long) ftell(f); }
+__attribute__((weak)) ssize_t __write_chk(int fd, const void *buf, size_t count, size_t buf_size) { (void) buf_size; return write(fd, buf, count); }
 C
 "$CC" -c -fPIC -O2 -o "$W/compat.o" "$W/compat.c"
 export CGO_CFLAGS="-I$P/include" CGO_LDFLAGS="-L$P/lib -lm $W/compat.o"
