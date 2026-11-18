@@ -7,7 +7,7 @@ VERSION="v0.10.7"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="$ROOT/app/src/main/jniLibs/armeabi-v7a/libgolibrespot.so"
 if [ -s "$OUT" ]; then echo "déjà compilé"; exit 0; fi
-NDK="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-}}"
+NDK="${ANDROID_NDK_ROOT:-${ANDROID_NDK_HOME:-}}"  # NDK 27 (le 30 refuse la config Android de vcpkg)
 export ANDROID_NDK_HOME="$NDK"
 echo "NDK=$NDK"; ls "$NDK" | head; env | grep -i ndk || true
 W="${RUNNER_TEMP:-/tmp}/glr"
