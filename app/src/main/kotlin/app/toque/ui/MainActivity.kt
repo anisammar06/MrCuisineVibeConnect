@@ -49,6 +49,7 @@ class MainActivity : Activity() {
     private val main = Handler(Looper.getMainLooper())
     private var unsubscribe: (() -> Unit)? = null
     private var unsubscribeEvents: (() -> Unit)? = null
+    private var unsubscribeTimers: (() -> Unit)? = null
     private var tone: ToneGenerator? = null
     private var toastView: TextView? = null
     private var lastKnobMs = 0L
@@ -113,6 +114,8 @@ class MainActivity : Activity() {
             stack.lastOrNull()?.onSnapshot(s)
         }
         unsubscribeEvents = app.machine.onEvent { e -> onMachineEvent(e) }
+        unsubscribeTimers = app.toque.kitchen.Timers.onChange { topBar.updateTimers() }
+        topBar.updateTimers()
         topBar.startClock()
     }
 
@@ -127,6 +130,7 @@ class MainActivity : Activity() {
     override fun onStop() {
         unsubscribe?.invoke()
         unsubscribeEvents?.invoke()
+        unsubscribeTimers?.invoke()
         topBar.stopClock()
         super.onStop()
     }

@@ -21,6 +21,8 @@ class HomeScreen(a: MainActivity) : Screen(a) {
     private lateinit var greeting: TextView
     private lateinit var recipesSub: TextView
     private lateinit var favSub: TextView
+    private lateinit var shopSub: TextView
+    private lateinit var timerSub: TextView
     private lateinit var resumeCard: LinearLayout
     private lateinit var resumeText: TextView
     private var unsub: (() -> Unit)? = null
@@ -80,8 +82,12 @@ class HomeScreen(a: MainActivity) : Screen(a) {
         rows[1].addView(t5, tileLp(true))
         rows[1].addView(tile(Icon.Kind.PLAY, tr("Médias"), tr("Vidéos, musique, partage")) { a.push(MediaScreen(a)) }.first, tileLp(false))
         rows[2].addView(soon(Icon.Kind.BOOK, tr("Recettes Thermomix"), tr("Cookidoo converti")), tileLp(true))
-        rows[2].addView(soon(Icon.Kind.CHECK, tr("Liste de courses"), tr("Depuis les recettes")), tileLp(true))
-        rows[2].addView(soon(Icon.Kind.TIMER, tr("Minuteurs"), tr("Plusieurs à la fois")), tileLp(false))
+        val (t8, s8) = tile(Icon.Kind.CHECK, tr("Liste de courses")) { a.push(ShoppingScreen(a)) }
+        shopSub = s8
+        rows[2].addView(t8, tileLp(true))
+        val (t9, s9) = tile(Icon.Kind.TIMER, tr("Minuteurs")) { a.push(TimersScreen(a)) }
+        timerSub = s9
+        rows[2].addView(t9, tileLp(false))
         for ((i, r) in rows.withIndex()) grid.addView(r, LinearLayout.LayoutParams(Ui.MATCH, 0, 1f).apply { if (i < 2) bottomMargin = Ui.u(12) })
         root.addView(grid, LinearLayout.LayoutParams(0, Ui.MATCH, 0.58f))
         return root
@@ -136,6 +142,11 @@ class HomeScreen(a: MainActivity) : Screen(a) {
         }
         val favs = repo.index.entries.count { it.favorite }
         favSub.text = if (favs == 0) tr("Aucun favori") else if (favs == 1) tr("1 favori") else tr("%d favoris", favs)
+        val shop = app.toque.kitchen.Shopping.get(c).remaining
+        shopSub.text = if (shop == 0) tr("Depuis les recettes") else tr("%d à acheter", shop)
+        val now = System.currentTimeMillis()
+        val running = app.toque.kitchen.Timers.get(c).timers.count { !it.finished(now) }
+        timerSub.text = if (running == 0) tr("Plusieurs à la fois") else tr("%d en cours", running)
         val guided = a.prefs.guidedRecipe
         val title = if (guided.isEmpty()) null else repo.index.entries.firstOrNull { it.id == guided }?.title
         resumeCard.visibility = if (title != null) View.VISIBLE else View.GONE
@@ -147,7 +158,9 @@ class HomeScreen(a: MainActivity) : Screen(a) {
         refresh()
         val u1 = a.app.recipes.onChange { refresh() }
         val u2 = SyncProgress.onChange { refresh() }
-        unsub = { u1(); u2() }
+        val u3 = app.toque.kitchen.Shopping.onChange { refresh() }
+        val u4 = app.toque.kitchen.Timers.onChange { refresh() }
+        unsub = { u1(); u2(); u3(); u4() }
         view.removeCallbacks(tick)
         view.postDelayed(tick, 10_000)
     }

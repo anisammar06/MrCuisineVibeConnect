@@ -43,6 +43,8 @@ class TopBar(private val a: MainActivity) : LinearLayout(a) {
     private val link = Ui.chip(a, "", Icon.Kind.LINK, Ui.TEXT2)
     private val clock = Ui.text(a, "", 22f, Ui.TEXT, Ui.LIGHT)
     private val home = Icon(a, Icon.Kind.HOME, Ui.TEXT2)
+    /** Minuteurs de cuisine en cours, visibles sur tous les écrans. */
+    private val timers = Ui.horizontal(a)
     private val handler = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
         override fun run() {
@@ -64,6 +66,7 @@ class TopBar(private val a: MainActivity) : LinearLayout(a) {
         back.setOnClickListener { if (a.depth > 1) a.back() else a.push(app.toque.ui.screens.SettingsScreen(a)) }
         addView(back, LayoutParams(Ui.u(52), Ui.u(52)))
         addView(titleView, LayoutParams(0, Ui.WRAP, 1f).apply { leftMargin = Ui.u(6) })
+        addView(timers, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
         addView(lid, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
         addView(temp, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
         addView(link, Ui.lp(Ui.WRAP, Ui.WRAP, r = 16))
@@ -98,6 +101,29 @@ class TopBar(private val a: MainActivity) : LinearLayout(a) {
         back.color = if (canGoBack) Ui.TEXT else Ui.ACCENT
         back.visibility = View.VISIBLE
         home.visibility = if (canGoBack) View.VISIBLE else View.GONE
+    }
+
+    /** Pastilles des minuteurs (2 au plus, puis « +n ») ; un appui ouvre l'écran Minuteurs. */
+    fun updateTimers() {
+        val now = System.currentTimeMillis()
+        val list = app.toque.kitchen.Timers.get(a).timers.filter { !it.dismissed || !it.finished(now) }
+            .sortedBy { it.leftMs(now) }
+        timers.removeAllViews()
+        for (t in list.take(2)) {
+            val ringing = t.ringing(now)
+            val color = when {
+                ringing -> Ui.DANGER
+                t.paused -> Ui.WARN
+                else -> Ui.ACCENT
+            }
+            val label = t.name.take(10) + " " + if (t.finished(now)) "0:00" else app.toque.core.kitchen.TimerBoard.format(t.leftMs(now))
+            val chip = Ui.chip(a, label, Icon.Kind.TIMER, color, if (ringing) 0x44FF5252 else Ui.SURFACE2)
+            chip.isClickable = true
+            chip.setOnClickListener { if (a.current !is app.toque.ui.screens.TimersScreen) a.push(app.toque.ui.screens.TimersScreen(a)) }
+            timers.addView(chip, Ui.lp(Ui.WRAP, Ui.WRAP, r = 8))
+        }
+        if (list.size > 2) timers.addView(Ui.chip(a, "+" + (list.size - 2), null, Ui.TEXT2))
+        timers.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE
     }
 
     fun update(s: Snapshot) {

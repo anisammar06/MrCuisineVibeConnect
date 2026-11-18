@@ -190,6 +190,10 @@ class ReceiverService : Service() {
             reply(out, 200, linkedMapOf("app" to "gotuj", "name" to NAME, "version" to version))
             return
         }
+        if (r.path == "/courses" || r.path.startsWith("/courses/")) {
+            courses(r, out)
+            return
+        }
         if (r.headers["x-code"] != prefs.receiverCode) {
             reply(out, 401, linkedMapOf("ok" to false, "message" to "Code d'appairage incorrect"))
             return
@@ -242,6 +246,50 @@ class ReceiverService : Service() {
         }
     }
 
+    // ------------------------------------------------------------------ liste de courses (téléphone)
+
+    /**
+     * Page web de la liste de courses, ouverte en scannant le code QR de l'écran Liste de courses.
+     * Le code d'appairage est dans l'adresse (?k=). Les articles se cochent depuis le téléphone ;
+     * hors Wi-Fi (au magasin), la page déjà ouverte reste utilisable et coche en local.
+     */
+    private fun courses(r: Request, out: OutputStream) {
+        if (r.query["k"] != prefs.receiverCode) {
+            raw(out, 401, "text/html", "<meta name=viewport content='width=device-width'><p style='font:18px sans-serif'>Code incorrect : scannez à nouveau le code QR affiché sur le robot.</p>")
+            return
+        }
+        when (r.path) {
+            "/courses" -> raw(out, 200, "text/html", COURSES_PAGE)
+            "/courses/data" -> raw(out, 200, "application/json", itemsJson())
+            "/courses/toggle" -> {
+                val id = r.query["id"].orEmpty()
+                val done = r.query["done"] == "1"
+                app.toque.kitchen.Shopping.edit(this) { it.setDone(id, done) }
+                raw(out, 200, "application/json", itemsJson())
+            }
+            "/courses/add" -> {
+                val len = (r.headers["content-length"]?.toIntOrNull() ?: 0).coerceIn(0, 4096)
+                val text = String(readFully(r.body, len), Charsets.UTF_8)
+                app.toque.kitchen.Shopping.edit(this) { l -> text.lines().forEach { l.addText(it) } }
+                raw(out, 200, "application/json", itemsJson())
+            }
+            else -> raw(out, 404, "text/plain", "Inconnu")
+        }
+    }
+
+    private fun itemsJson(): String = Json.write(app.toque.kitchen.Shopping.get(this).items.map {
+        linkedMapOf("id" to it.id, "text" to it.display, "recipes" to it.recipes.joinToString(" · "), "done" to it.done)
+    })
+
+    private fun raw(out: OutputStream, code: Int, type: String, text: String) {
+        val body = text.toByteArray(Charsets.UTF_8)
+        val status = if (code == 200) "OK" else if (code == 401) "Unauthorized" else "Not Found"
+        out.write(("HTTP/1.1 $code $status\r\nContent-Type: $type; charset=utf-8\r\nCache-Control: no-store\r\n" +
+            "Content-Length: ${body.size}\r\nConnection: close\r\n\r\n").toByteArray())
+        out.write(body)
+        out.flush()
+    }
+
     private fun readFully(input: InputStream, n: Int): ByteArray {
         val buf = ByteArray(n)
         var off = 0
@@ -268,6 +316,49 @@ class ReceiverService : Service() {
         const val PORT = 8770
         const val NAME = "Gotuj z Kasią"
         const val SERVICE_TYPE = "_gotuj._tcp."
+
+        private val COURSES_PAGE = """<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#16171b">
+<title>Courses · Gotuj z Kasią</title>
+<style>
+body{margin:0;background:#16171b;color:#f3f1ec;font:18px/1.35 system-ui,sans-serif}
+header{position:sticky;top:0;background:#16171b;padding:16px 18px 10px;border-bottom:1px solid #2a2c33}
+h1{margin:0;font-size:22px;font-weight:600}#st{color:#9a978f;font-size:14px;margin-top:2px}
+ul{list-style:none;margin:0;padding:6px 10px 120px}
+li{display:flex;align-items:center;gap:14px;padding:14px 10px;border-bottom:1px solid #24262c}
+li .b{width:28px;height:28px;border-radius:9px;border:2px solid #555;flex:none;display:flex;align-items:center;justify-content:center;font-size:18px}
+li.d .b{border-color:#5fd38d;color:#5fd38d}li.d .t{text-decoration:line-through;color:#77746d}
+.r{color:#8b887f;font-size:13px}
+form{position:fixed;bottom:0;left:0;right:0;display:flex;gap:8px;padding:12px;background:#1d1f24}
+input{flex:1;font-size:18px;padding:12px;border-radius:12px;border:1px solid #333;background:#121317;color:#fff}
+button{font-size:17px;padding:12px 16px;border-radius:12px;border:0;background:#ff9a3c;color:#1a0e05;font-weight:600}
+#copy{background:#2a2c33;color:#f3f1ec}
+</style></head><body>
+<header><h1>Liste de courses</h1><div id="st">Chargement…</div></header>
+<ul id="l"></ul>
+<form id="f"><input id="i" placeholder="Ajouter un article" autocomplete="off"><button>+</button><button type="button" id="copy">Copier</button></form>
+<script>
+var K=new URLSearchParams(location.search).get('k'),items=[];
+try{items=JSON.parse(localStorage.getItem('courses')||'[]')}catch(e){}
+function st(t){document.getElementById('st').textContent=t}
+function draw(){var u=document.getElementById('l');u.innerHTML='';var left=0;
+items.slice().sort(function(a,b){return a.done-b.done}).forEach(function(x){if(!x.done)left++;
+var li=document.createElement('li');if(x.done)li.className='d';
+li.innerHTML='<span class=b>'+(x.done?'✓':'')+'</span><span><span class=t></span><br><span class=r></span></span>';
+li.querySelector('.t').textContent=x.text;li.querySelector('.r').textContent=x.recipes;
+li.onclick=function(){x.done=!x.done;save();draw();send('/courses/toggle?k='+K+'&id='+x.id+'&done='+(x.done?1:0))};u.appendChild(li)});
+if(!items.length)u.innerHTML='<li>Liste vide</li>';return left}
+function save(){try{localStorage.setItem('courses',JSON.stringify(items))}catch(e){}}
+function ok(j){items=j;save();var n=draw();st(n+' à acheter · synchronisé avec le robot')}
+function send(p,body){fetch(p,{method:body===undefined?'POST':'POST',body:body}).then(function(r){return r.json()}).then(ok).catch(function(){st('Hors du Wi-Fi : cochés sur ce téléphone seulement')})}
+function load(){fetch('/courses/data?k='+K).then(function(r){return r.json()}).then(ok).catch(function(){draw();st('Hors du Wi-Fi : dernière liste reçue')})}
+document.getElementById('f').onsubmit=function(e){e.preventDefault();var v=document.getElementById('i').value.trim();if(!v)return;document.getElementById('i').value='';send('/courses/add?k='+K,v)};
+document.getElementById('copy').onclick=function(){var t=items.filter(function(x){return!x.done}).map(function(x){return'• '+x.text}).join('\n');
+var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');st('Liste copiée : collez-la dans une note')}catch(e){}a.remove()};
+draw();load();document.addEventListener('visibilitychange',function(){if(!document.hidden)load()});
+</script></body></html>"""
 
         fun start(c: Context) {
             if (Prefs(c).receiverEnabled) c.startService(Intent(c, ReceiverService::class.java))

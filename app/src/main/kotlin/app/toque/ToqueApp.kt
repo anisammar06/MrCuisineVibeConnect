@@ -57,6 +57,7 @@ class ToqueApp : Application() {
         }
         log.write("interface", "démarrage")
         TimeSync.start(this, prefs, log)
+        app.toque.kitchen.Timers.restore(this)
     }
 
     private fun isMainProcess(): Boolean {

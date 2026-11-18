@@ -59,6 +59,15 @@
             android:name=".media.MiniPlayer"
             android:exported="false" />
 
+        <!-- Sonnerie des minuteurs de cuisine (par-dessus toutes les applis). -->
+        <service
+            android:name=".kitchen.TimerRing"
+            android:exported="false" />
+
+        <receiver
+            android:name=".kitchen.TimerAlarm"
+            android:exported="false" />
+
         <service
             android:name=".recipes.SyncService"
             android:exported="false" />

@@ -15,8 +15,8 @@ android {
         targetSdk = 28
         // Pour publier une mise à jour : augmenter les deux valeurs puis pousser sur GitHub
         // (la version est publiée automatiquement, voir .github/workflows/release.yml).
-        versionCode = 11
-        versionName = "0.7.0"
+        versionCode = 12
+        versionName = "0.8.0"
     }
 
     signingConfigs {
@@ -61,4 +61,6 @@ kotlin {
 
 dependencies {
     implementation(project(":core"))
+    // Code QR de la liste de courses (bibliothèque Java pure, sans AndroidX).
+    implementation("com.google.zxing:core:3.5.3")
 }

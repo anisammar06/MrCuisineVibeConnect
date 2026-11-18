@@ -11,6 +11,7 @@ import app.toque.core.i18n.tr
 import app.toque.core.recipes.McOnline
 import app.toque.core.recipes.Recipe
 import app.toque.core.recipes.Step
+import app.toque.kitchen.Shopping
 import app.toque.recipes.Reviews
 import app.toque.ui.Icon
 import app.toque.ui.ImageLoader
@@ -66,6 +67,10 @@ class RecipeScreen(a: MainActivity, private val recipe: Recipe) : Screen(a) {
         favLabel = Ui.text(c, "", 18f, Ui.TEXT, Ui.MEDIUM)
         fav.addView(favLabel, LinearLayout.LayoutParams(Ui.WRAP, Ui.WRAP).apply { leftMargin = Ui.u(8) })
         actions.addView(fav)
+        if (recipe.allIngredients.isNotEmpty()) {
+            actions.addView(Ui.button(c, tr("Courses"), Ui.Style.SECONDARY, Icon.Kind.CHECK, height = 66, textSize = 18f) { askShopping() },
+                Ui.lp(Ui.WRAP, Ui.WRAP, l = 10))
+        }
         left.addView(actions, Ui.lp(t = 14))
 
         val ing = Ui.vertical(c)
@@ -195,6 +200,67 @@ class RecipeScreen(a: MainActivity, private val recipe: Recipe) : Screen(a) {
         if (chips.childCount > 0) col.addView(chips, Ui.lp(t = 8))
         row.addView(col, LinearLayout.LayoutParams(0, Ui.WRAP, 1f))
         return row
+    }
+
+    // ------------------------------------------------------------------ liste de courses
+
+    /** Choix des portions et des ingrédients à acheter (le sel ou l'huile qu'on a déjà se décochent). */
+    private fun askShopping() {
+        val items = recipe.allIngredients
+        val chosen = BooleanArray(items.size) { true }
+        var servings = recipe.servings
+        val card = Ui.card(c, 28f, Ui.SURFACE2)
+        card.setPadding(Ui.u(28), Ui.u(24), Ui.u(28), Ui.u(22))
+        card.addView(Ui.text(c, tr("Ajouter à la liste de courses"), 24f, Ui.TEXT, Ui.MEDIUM))
+        val addBtn = Ui.button(c, tr("Ajouter"), Ui.Style.PRIMARY, Icon.Kind.CHECK, height = 60) {
+            val picked = items.filterIndexed { i, _ -> chosen[i] }
+            val n = Shopping.edit(c) { it.addIngredients(recipe.title, picked, recipe.servings, servings) }
+            a.closeOverlay()
+            a.toast(tr("%d ingrédients ajoutés à la liste de courses", n))
+        }
+        fun refreshAdd() {
+            Ui.chipText(addBtn).text = tr("Ajouter (%d)", chosen.count { it })
+            Ui.setButtonEnabled(addBtn, chosen.any { it })
+        }
+        if (recipe.servings > 0) {
+            val row = Ui.horizontal(c)
+            row.addView(Ui.text(c, tr("Portions"), 19f, Ui.TEXT2), LinearLayout.LayoutParams(0, Ui.WRAP, 1f))
+            val value = Ui.text(c, "", 26f, Ui.TEXT, Ui.MEDIUM).apply { gravity = Gravity.CENTER }
+            fun show() { value.text = servings.toString() }
+            row.addView(Ui.button(c, "", Ui.Style.SECONDARY, Icon.Kind.MINUS, height = 54) { if (servings > 1) { servings--; show() } })
+            row.addView(value, LinearLayout.LayoutParams(Ui.u(70), Ui.WRAP))
+            row.addView(Ui.button(c, "", Ui.Style.SECONDARY, Icon.Kind.PLUS, height = 54) { if (servings < 24) { servings++; show() } })
+            show()
+            card.addView(row, Ui.lp(t = 14))
+        }
+        val listBox = Ui.vertical(c)
+        for ((i, ing) in items.withIndex()) {
+            val r = Ui.horizontal(c)
+            r.setPadding(Ui.u(6), Ui.u(8), Ui.u(6), Ui.u(8))
+            val box = Icon(c, Icon.Kind.CHECK, Ui.OK)
+            box.setPadding(Ui.u(5), Ui.u(5), Ui.u(5), Ui.u(5))
+            box.background = Ui.round(0, 14f, Ui.OK, 2f)
+            r.addView(box, LinearLayout.LayoutParams(Ui.u(30), Ui.u(30)).apply { rightMargin = Ui.u(12) })
+            val label = Ui.text(c, ing.display, 18f, Ui.TEXT)
+            r.addView(label, LinearLayout.LayoutParams(0, Ui.WRAP, 1f))
+            r.isClickable = true
+            r.background = Ui.pressable(Ui.round(0, 12f), 12f)
+            r.setOnClickListener {
+                chosen[i] = !chosen[i]
+                box.alpha = if (chosen[i]) 1f else 0.15f
+                label.setTextColor(if (chosen[i]) Ui.TEXT else Ui.TEXT3)
+                refreshAdd()
+            }
+            listBox.addView(r)
+        }
+        card.addView(Ui.scroll(c, listBox), LinearLayout.LayoutParams(Ui.MATCH, Ui.u(250)).apply { topMargin = Ui.u(10) })
+        card.addView(Ui.text(c, tr("Touchez un ingrédient que vous avez déjà pour le retirer."), 15f, Ui.TEXT3), Ui.lp(t = 8))
+        val actions = Ui.horizontal(c, Gravity.END or Gravity.CENTER_VERTICAL)
+        actions.addView(Ui.button(c, tr("Annuler"), Ui.Style.GHOST, height = 60) { a.closeOverlay() }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 12))
+        actions.addView(addBtn)
+        card.addView(actions, Ui.lp(t = 14))
+        refreshAdd()
+        a.showOverlay(card, 700)
     }
 
     private fun toggleFavorite() {
