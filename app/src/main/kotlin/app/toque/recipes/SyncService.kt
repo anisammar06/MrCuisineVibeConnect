@@ -20,7 +20,7 @@ class SyncService : IntentService("toque-synchro") {
         val app = ToqueApp.of(this)
         if (!app.prefs.autoSync) return
         if (System.currentTimeMillis() - app.prefs.lastSyncMs < 6 * 3600_000L) return
-        OnlineSync(this, app.prefs, app.recipes, app.log).sync()
+        OnlineSync.syncAll(this, app)
     }
 
     companion object {

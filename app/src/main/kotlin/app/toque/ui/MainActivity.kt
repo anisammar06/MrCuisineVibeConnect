@@ -86,7 +86,8 @@ class MainActivity : Activity() {
         }
 
         app.machine.connect()
-        app.recipes.load()
+        app.recipesFr.load()
+        app.recipesPl.load()
         SyncService.schedule(this)
         push(HomeScreen(this))
         if (reopenSettings) {
@@ -367,7 +368,7 @@ class MainActivity : Activity() {
         prefs.vendorSession = false
         toast(tr("Reprise de la main sur le robot…"))
         Thread {
-            val sync = LidlSync(this, prefs, app.recipes, app.log)
+            val sync = LidlSync(this, prefs, app.recipesFr, app.log)
             sync.forceStop()
             sync.setVendorHardware(false)
             main.post { machine.resumePort() }
@@ -398,7 +399,7 @@ class MainActivity : Activity() {
                         }
                         return@Thread
                     }
-                    val sync = LidlSync(this, prefs, app.recipes, app.log)
+                    val sync = LidlSync(this, prefs, app.recipesFr, app.log)
                     val enabled = sync.setVendorHardware(true)
                     val launch = sync.components().launch
                     main.post {

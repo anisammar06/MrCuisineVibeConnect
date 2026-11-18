@@ -29,12 +29,13 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Requêtes espacées pour ne pas charger les serveurs. Reprend où elle s'est arrêtée.
  */
 class OnlineSync(private val context: Context, private val prefs: Prefs, private val repo: RecipeRepo, private val log: Logbook) {
+    private val lang = repo.lang
     private val version = try {
         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
     } catch (_: Exception) {
         "?"
     }
-    private val indexFile = File(context.filesDir, "recettes-en-ligne.json")
+    private val indexFile = File(context.filesDir, if (lang == "fr") "recettes-en-ligne.json" else "recettes-en-ligne-$lang.json")
 
     fun sync(progress: (String) -> Unit = {}): LidlSync.Report {
         if (!running.compareAndSet(false, true)) return LidlSync.Report(false, tr("Synchronisation déjà en cours"))
@@ -49,7 +50,7 @@ class OnlineSync(private val context: Context, private val prefs: Prefs, private
     }
 
     private fun run(progress: (String) -> Unit): LidlSync.Report {
-        val language = McOnline.languageFor(I18n.code)
+        val language = McOnline.languageFor(lang)
         val stored = readIndex()
         val index = if (stored.first == language) HashMap(stored.second) else HashMap()
 
@@ -234,7 +235,10 @@ class OnlineSync(private val context: Context, private val prefs: Prefs, private
     private fun finish(r: LidlSync.Report): LidlSync.Report {
         val stamp = SimpleDateFormat(tr("dd/MM à HH:mm"), I18n.locale).format(Date())
         prefs.lastSyncMs = System.currentTimeMillis()
-        prefs.lastSyncResult = "$stamp : ${r.message}"
+        // Une ligne par langue (« FR 18/11 à 03:30 : … »), les autres langues conservées.
+        val tag = lang.uppercase() + " "
+        val others = prefs.lastSyncResult.lines().filter { line -> RecipeRepo.LANGS.any { line.startsWith(it.uppercase() + " ") } && !line.startsWith(tag) }
+        prefs.lastSyncResult = (others + "$tag$stamp : ${r.message}").sorted().joinToString("\n")
         log.write("synchro", r.message)
         return r
     }
@@ -249,5 +253,19 @@ class OnlineSync(private val context: Context, private val prefs: Prefs, private
     companion object {
         private const val MAX_WIDTH = 800
         private val running = AtomicBoolean(false)
+
+        /** Synchronise chaque langue choisie, l'une après l'autre ; rapport de la dernière en échec, sinon global. */
+        fun syncAll(context: Context, app: app.toque.ToqueApp, progress: (String) -> Unit = {}): LidlSync.Report {
+            var last: LidlSync.Report? = null
+            var total = 0
+            for (l in app.syncLangs()) {
+                val r = OnlineSync(context, app.prefs, app.repo(l), app.log).sync { msg -> progress(l.uppercase() + " · " + msg) }
+                if (!r.ok) return r
+                total += r.recipes
+                last = r
+            }
+            return if (app.syncLangs().size > 1) LidlSync.Report(true, tr("%d recettes Lidl à jour (FR + PL)", total), total)
+            else last ?: LidlSync.Report(false, tr("Aucune langue à synchroniser"))
+        }
     }
 }

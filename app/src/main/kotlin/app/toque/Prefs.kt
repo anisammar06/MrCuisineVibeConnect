@@ -39,6 +39,20 @@ class Prefs(context: Context) {
             p.edit().putString("language", v).commit()
         }
 
+    /** Langue des recettes affichées : « fr » ou « pl » (catalogues gardés en parallèle). */
+    var recipeLang: String
+        get() = p.getString("recipeLang", "fr") ?: "fr"
+        set(v) {
+            p.edit().putString("recipeLang", v).commit()
+        }
+
+    /** Synchroniser aussi le catalogue polonais. */
+    var syncPolish: Boolean
+        get() = p.getBoolean("syncPolish", true)
+        set(v) {
+            p.edit().putBoolean("syncPolish", v).commit()
+        }
+
     var twinHost: String
         get() = p.getString("twinHost", "127.0.0.1") ?: "127.0.0.1"
         set(v) {

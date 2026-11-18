@@ -17,8 +17,8 @@ import java.util.concurrent.Executors
  * Recettes Lidl copiées localement (SQLite) + index de recherche en mémoire.
  * L'appli fonctionne entièrement hors ligne ; seule la synchro passe par le réseau.
  */
-class RecipeRepo(private val context: Context) {
-    private val helper = object : SQLiteOpenHelper(context, "recettes.db", null, 1) {
+class RecipeRepo(private val context: Context, val lang: String = "fr") {
+    private val helper = object : SQLiteOpenHelper(context, dbName(lang), null, 1) {
         override fun onCreate(db: SQLiteDatabase) {
             db.execSQL("CREATE TABLE recipes (id TEXT PRIMARY KEY, title TEXT NOT NULL, json TEXT NOT NULL, updated INTEGER NOT NULL)")
             db.execSQL("CREATE TABLE favorites (id TEXT PRIMARY KEY)")
@@ -26,7 +26,7 @@ class RecipeRepo(private val context: Context) {
 
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {}
     }
-    private val exec = Executors.newSingleThreadExecutor { r -> Thread(r, "toque-recettes").apply { priority = Thread.NORM_PRIORITY - 1 } }
+    private val exec = Executors.newSingleThreadExecutor { r -> Thread(r, "toque-recettes-$lang").apply { priority = Thread.NORM_PRIORITY - 1 } }
     private val main = Handler(Looper.getMainLooper())
     private val listeners = ArrayList<() -> Unit>()
 
@@ -191,4 +191,12 @@ class RecipeRepo(private val context: Context) {
     }
 
     fun runInBackground(block: () -> Unit) = exec.execute(block)
+
+    companion object {
+        /** Langues des catalogues gardés en parallèle. */
+        val LANGS = listOf("fr", "pl")
+
+        /** Le catalogue français garde le fichier d'origine de Toque (rien à retélécharger). */
+        fun dbName(lang: String) = if (lang == "fr") "recettes.db" else "recettes-$lang.db"
+    }
 }

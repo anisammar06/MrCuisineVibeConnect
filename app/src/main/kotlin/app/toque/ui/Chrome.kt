@@ -60,7 +60,8 @@ class TopBar(private val a: MainActivity) : LinearLayout(a) {
         setBackgroundColor(Ui.BG)
         back.setPadding(Ui.u(10), Ui.u(10), Ui.u(10), Ui.u(10))
         back.background = Ui.pressable(Ui.round(0, 30f), 30f)
-        back.setOnClickListener { a.back() }
+        // Sur l'accueil, le même bouton devient l'engrenage des Réglages (angle haut gauche).
+        back.setOnClickListener { if (a.depth > 1) a.back() else a.push(app.toque.ui.screens.SettingsScreen(a)) }
         addView(back, LayoutParams(Ui.u(52), Ui.u(52)))
         addView(titleView, LayoutParams(0, Ui.WRAP, 1f).apply { leftMargin = Ui.u(6) })
         addView(lid, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
@@ -93,7 +94,9 @@ class TopBar(private val a: MainActivity) : LinearLayout(a) {
 
     fun setTitle(t: String, canGoBack: Boolean) {
         titleView.text = t
-        back.visibility = if (canGoBack) View.VISIBLE else View.INVISIBLE
+        back.set(if (canGoBack) Icon.Kind.BACK else Icon.Kind.SETTINGS)
+        back.color = if (canGoBack) Ui.TEXT else Ui.ACCENT
+        back.visibility = View.VISIBLE
         home.visibility = if (canGoBack) View.VISIBLE else View.GONE
     }
 

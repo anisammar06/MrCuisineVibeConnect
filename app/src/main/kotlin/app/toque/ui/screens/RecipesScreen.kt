@@ -46,6 +46,7 @@ class RecipesScreen(a: MainActivity, private val focusSearch: Boolean = false, f
     private lateinit var chips: LinearLayout
     private lateinit var grid: GridView
     private lateinit var count: TextView
+    private lateinit var langBox: LinearLayout
     private lateinit var empty: LinearLayout
     private lateinit var emptyText: TextView
     private val adapter = Adapter()
@@ -89,6 +90,10 @@ class RecipesScreen(a: MainActivity, private val focusSearch: Boolean = false, f
         bar.addView(field, LinearLayout.LayoutParams(0, Ui.u(64), 1f))
         count = Ui.text(c, "", 17f, Ui.TEXT2)
         bar.addView(count, Ui.lp(Ui.WRAP, Ui.WRAP, l = 18))
+        // Bascule entre les catalogues français et polonais (gardés tous les deux sur le robot).
+        langBox = Ui.horizontal(c)
+        bar.addView(langBox, Ui.lp(Ui.WRAP, Ui.WRAP, l = 14))
+        buildLang()
         root.addView(bar)
 
         val scroller = HorizontalScrollView(c).apply { isHorizontalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER }
@@ -130,6 +135,26 @@ class RecipesScreen(a: MainActivity, private val focusSearch: Boolean = false, f
         return root
     }
 
+    private fun buildLang() {
+        langBox.removeAllViews()
+        val current = a.prefs.recipeLang
+        for ((code, label) in listOf("fr" to "FR", "pl" to "PL")) {
+            langBox.addView(Ui.toggleChip(c, label, current == code) { switchLang(code) }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 6))
+        }
+    }
+
+    private fun switchLang(code: String) {
+        if (code == a.prefs.recipeLang) return
+        unsub?.invoke()
+        a.prefs.recipeLang = code
+        // Les catégories diffèrent d'une langue à l'autre : on garde seulement « Favoris » / durée.
+        filter = RecipeFilter(favoritesOnly = filter.favoritesOnly, maxMinutes = filter.maxMinutes)
+        unsub = a.app.recipes.onChange { buildChips(); search() }
+        buildLang()
+        buildChips()
+        search()
+    }
+
     private fun buildChips() {
         chips.removeAllViews()
         fun chip(label: String, selected: Boolean, f: RecipeFilter) {
@@ -164,6 +189,10 @@ class RecipesScreen(a: MainActivity, private val focusSearch: Boolean = false, f
         count.text = if (results.isEmpty()) "" else if (results.size == 1) tr("1 recette") else tr("%d recettes", results.size)
         empty.visibility = if (results.isEmpty() && repo.loaded) View.VISIBLE else View.GONE
         emptyText.text = when {
+            none && a.prefs.recipeLang == "pl" && !a.prefs.syncPolish ->
+                tr("Le catalogue polonais n'est pas activé.\nRéglages › Recettes Lidl › Recettes en polonais aussi, puis Synchroniser.")
+            none && a.prefs.recipeLang == "pl" ->
+                tr("Les recettes polonaises apparaîtront après la prochaine synchronisation.\nRéglages › Recettes Lidl › Synchroniser.")
             none && a.prefs.mode == Prefs.Mode.HARDWARE ->
                 tr("Les recettes Lidl apparaîtront après la première synchronisation.\nRéglages › Recettes Lidl › Synchroniser.")
             none -> tr("Les recettes Lidl apparaîtront après la première synchronisation, une fois Toque installé sur le robot.")
@@ -173,6 +202,7 @@ class RecipesScreen(a: MainActivity, private val focusSearch: Boolean = false, f
     }
 
     override fun onShow() {
+        buildLang()
         buildChips()
         search()
         unsub = a.app.recipes.onChange { buildChips(); search() }

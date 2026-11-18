@@ -19,7 +19,16 @@ class ToqueApp : Application() {
     lateinit var log: Logbook
         private set
     val machine: MachineClient by lazy { MachineClient(this) }
-    val recipes: RecipeRepo by lazy { RecipeRepo(this) }
+    val recipesFr: RecipeRepo by lazy { RecipeRepo(this, "fr") }
+    val recipesPl: RecipeRepo by lazy { RecipeRepo(this, "pl") }
+
+    /** Catalogue dans la langue choisie sur l'écran Recettes (bouton FR | PL). */
+    val recipes: RecipeRepo get() = repo(prefs.recipeLang)
+
+    fun repo(lang: String): RecipeRepo = if (lang == "pl") recipesPl else recipesFr
+
+    /** Langues à synchroniser depuis monsieur-cuisine.com. */
+    fun syncLangs(): List<String> = if (prefs.syncPolish) listOf("fr", "pl") else listOf("fr")
 
     override fun onCreate() {
         super.onCreate()

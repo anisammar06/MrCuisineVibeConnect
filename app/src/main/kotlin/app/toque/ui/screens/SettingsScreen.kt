@@ -134,6 +134,12 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         b2.addView(Ui.button(c, tr("Ouvrir l'appli d'origine"), Ui.Style.GHOST, Icon.Kind.LINK, height = 52) { a.openVendorApp() })
         lidl.addView(b2, Ui.lp(t = 6))
         lidl.addView(toggle(tr("Synchro automatique chaque nuit"), a.prefs.autoSync) { a.prefs.autoSync = it }, Ui.lp(t = 10))
+        lidl.addView(toggle(tr("Recettes en polonais aussi (gardées à côté du français)"), a.prefs.syncPolish) { on ->
+            a.prefs.syncPolish = on
+            refreshSync()
+        }, Ui.lp(t = 10))
+        lidl.addView(Ui.text(c, tr("Sur l'écran Recettes, le bouton FR | PL passe d'un catalogue à l'autre. La première synchro polonaise prend environ 15 minutes."),
+            14f, Ui.TEXT3).apply { setLineSpacing(0f, 1.1f) }, Ui.lp(t = 6))
 
         // ---- Mises à jour
         val updates = section(left, tr("Mises à jour"), Icon.Kind.INFO)
@@ -292,7 +298,7 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         Thread {
             val problems = ArrayList<String>()
             if (!RootShell.available()) problems += tr("accès root refusé")
-            val sync = LidlSync(a, a.prefs, a.app.recipes, a.app.log)
+            val sync = LidlSync(a, a.prefs, a.app.recipesFr, a.app.log)
             if (problems.isEmpty() && sync.installed()) {
                 if (sync.components().hardwareService != null && !sync.setVendorHardware(false))
                     problems += tr("impossible de couper l'appli d'origine du moteur")
@@ -317,7 +323,7 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
             a.prefs.bootLaunch = false
             a.machine.reconfigure {
                 Thread {
-                    val sync = LidlSync(a, a.prefs, a.app.recipes, a.app.log)
+                    val sync = LidlSync(a, a.prefs, a.app.recipesFr, a.app.log)
                     sync.setVendorHardware(true)
                     val launch = sync.components().launch
                     view.post {
@@ -338,8 +344,8 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         syncing = true
         syncText.text = tr("Synchronisation en cours… (quelques minutes)")
         Thread {
-            val r = if (online) OnlineSync(a, a.prefs, a.app.recipes, a.app.log).sync { msg -> view.post { syncText.text = msg } }
-            else LidlSync(a, a.prefs, a.app.recipes, a.app.log).importNow { msg -> view.post { syncText.text = msg } }
+            val r = if (online) OnlineSync.syncAll(a, a.app) { msg -> view.post { syncText.text = msg } }
+            else LidlSync(a, a.prefs, a.app.recipesFr, a.app.log).importNow { msg -> view.post { syncText.text = msg } }
             view.post {
                 syncing = false
                 refreshSync()
@@ -375,8 +381,9 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
 
     private fun refreshSync() {
         val last = a.prefs.lastSyncResult
-        syncText.text = (if (last.isEmpty()) tr("Jamais synchronisé") else tr("Dernière synchro le %s", last)) +
-            "\n" + tr("%d recettes dans Toque", a.app.recipes.count)
+        syncText.text = (if (last.isEmpty()) tr("Jamais synchronisé") else tr("Dernières synchros :") + "\n" + last) +
+            "\n" + tr("%d recettes en français", a.app.recipesFr.count) +
+            (if (a.prefs.syncPolish || a.app.recipesPl.count > 0) " · " + tr("%d en polonais", a.app.recipesPl.count) else "")
     }
 
     // ------------------------------------------------------------------ mises à jour
