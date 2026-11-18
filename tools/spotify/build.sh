@@ -9,6 +9,7 @@ OUT="$ROOT/app/src/main/jniLibs/armeabi-v7a/libgolibrespot.so"
 if [ -s "$OUT" ]; then echo "déjà compilé"; exit 0; fi
 NDK="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-}}"
 export ANDROID_NDK_HOME="$NDK"
+echo "NDK=$NDK"; ls "$NDK" | head; env | grep -i ndk || true
 W="${RUNNER_TEMP:-/tmp}/glr"
 rm -rf "$W"; mkdir -p "$W"; cd "$W"
 git clone --depth 1 --branch "$VERSION" https://github.com/devgianlu/go-librespot src
@@ -16,7 +17,10 @@ git clone https://github.com/microsoft/vcpkg vcpkg
 ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
 cd src
 # Bibliothèques de décodage (ogg/vorbis, flac, mpg123) en statique pour Android ARM ; pas d'ALSA sur Android.
-"$W/vcpkg/vcpkg" install --triplet arm-android --x-install-root="$W/inst"
+"$W/vcpkg/vcpkg" install --triplet arm-android --x-install-root="$W/inst" || {
+  for f in "$W"/vcpkg/buildtrees/*/*.log; do echo "=== $f"; tail -n 40 "$f"; done
+  exit 1
+}
 P="$W/inst/arm-android"
 ls "$P/lib" "$P/lib/pkgconfig"
 export CGO_ENABLED=1 GOOS=android GOARCH=arm GOARM=7
