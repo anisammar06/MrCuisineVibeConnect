@@ -23,6 +23,9 @@ import app.toque.core.update.Release
 import app.toque.recipes.LidlSync
 import app.toque.recipes.OnlineSync
 import app.toque.recipes.SyncProgress
+import app.toque.recipes.CookidooClient
+import app.toque.recipes.CookidooProgress
+import app.toque.recipes.CookidooSync
 import app.toque.media.Received
 import app.toque.media.ReceiverService
 import app.toque.ui.Icon
@@ -38,6 +41,10 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
     private lateinit var host: EditText
     private lateinit var port: EditText
     private lateinit var syncText: TextView
+    private lateinit var tmText: TextView
+    private lateinit var tmLogin: LinearLayout
+    private lateinit var tmActions: LinearLayout
+    private var unsubTm: (() -> Unit)? = null
     private lateinit var recvText: TextView
     private var unsubProgress: (() -> Unit)? = null
     private lateinit var bowlText: TextView
@@ -145,6 +152,65 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         }, Ui.lp(t = 10))
         lidl.addView(Ui.text(c, tr("Sur l'écran Recettes, le bouton FR | PL passe d'un catalogue à l'autre. La première synchro polonaise prend environ 15 minutes."),
             14f, Ui.TEXT3).apply { setLineSpacing(0f, 1.1f) }, Ui.lp(t = 6))
+
+        // ---- Recettes Thermomix (Cookidoo)
+        val tm = section(right, tr("Recettes Thermomix"), Icon.Kind.BOOK)
+        tm.addView(Ui.text(c, tr("Votre compte Cookidoo (abonnement requis). Les recettes sont converties pour le robot : vitesse, température, temps, sens inverse, vapeur, pétrin et pesées."),
+            15f, Ui.TEXT2).apply { setLineSpacing(0f, 1.15f) })
+        tmText = Ui.text(c, "", 16f, Ui.TEXT).apply { setLineSpacing(0f, 1.15f) }
+        tm.addView(tmText, Ui.lp(t = 10))
+        tmLogin = Ui.vertical(c)
+        val email = field(a.prefs.cookidooEmail, tr("E-mail Cookidoo")).apply {
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+        }
+        tmLogin.addView(email, Ui.lp(Ui.MATCH, Ui.u(56), t = 10))
+        val password = field("", tr("Mot de passe (jamais enregistré)")).apply {
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        tmLogin.addView(password, Ui.lp(Ui.MATCH, Ui.u(56), t = 8))
+        tmLogin.addView(Ui.button(c, tr("Se connecter"), Ui.Style.PRIMARY, Icon.Kind.LINK, height = 56) {
+            val e = email.text.toString().trim()
+            val p = password.text.toString()
+            if (e.isEmpty() || p.isEmpty()) return@button
+            a.hideKeyboard()
+            tmText.text = tr("Connexion à Cookidoo…")
+            Thread {
+                val err = try {
+                    CookidooClient(a).login(e, p)
+                    null
+                } catch (x: Exception) {
+                    x.message ?: x.toString()
+                }
+                view.post {
+                    password.setText("")
+                    if (err != null) tmText.text = tr("Connexion impossible : %s", err) else {
+                        renderCookidoo()
+                        a.toast(tr("Compte Cookidoo connecté"), Ui.OK)
+                    }
+                }
+            }.start()
+        }, Ui.lp(Ui.WRAP, Ui.WRAP, t = 10))
+        tm.addView(tmLogin)
+        tmActions = Ui.vertical(c)
+        val tb = Ui.horizontal(c)
+        tb.addView(Ui.button(c, tr("Synchroniser"), Ui.Style.PRIMARY, Icon.Kind.SYNC, height = 56) {
+            Thread { CookidooSync.run(a.applicationContext) }.start()
+        }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
+        tb.addView(Ui.button(c, tr("Se déconnecter"), Ui.Style.GHOST, height = 52) {
+            CookidooClient(a).logout()
+            renderCookidoo()
+        })
+        tmActions.addView(tb, Ui.lp(t = 10))
+        tmActions.addView(toggle(tr("Synchro automatique chaque nuit"), a.prefs.cookidooAuto) { a.prefs.cookidooAuto = it }, Ui.lp(t = 10))
+        tmActions.addView(toggle(tr("Recettes en polonais aussi"), a.prefs.cookidooPolish) { a.prefs.cookidooPolish = it }, Ui.lp(t = 10))
+        tmActions.addView(Ui.text(c, tr("Nouvelles recettes ajoutées à chaque synchro (par langue)"), 16f, Ui.TEXT2), Ui.lp(t = 12))
+        val batches = listOf(0, 50, 150, 300).map { it.toString() to if (it == 0) tr("Aucune (seulement mes listes)") else tr("%d recettes", it) }
+        tmActions.addView(dropdown(batches, a.prefs.cookidooBatch.toString()) { v -> a.prefs.cookidooBatch = v.toInt() },
+            Ui.lp(Ui.MATCH, Ui.u(58), t = 6))
+        tmActions.addView(Ui.text(c, tr("Les recettes des listes de votre compte (créées sur le téléphone dans l'appli Thermomix) sont importées en premier et marquées en favori. Le reste du catalogue arrive petit à petit, à un rythme qui ne fait pas bloquer le compte."),
+            14f, Ui.TEXT3).apply { setLineSpacing(0f, 1.1f) }, Ui.lp(t = 10))
+        tm.addView(tmActions)
+        renderCookidoo()
 
         // ---- Réception (Médias)
         val recv = section(left, tr("Réception depuis le téléphone"), Icon.Kind.LINK)
@@ -406,6 +472,19 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         }.start()
     }
 
+    private fun renderCookidoo() {
+        val client = CookidooClient(a)
+        tmLogin.visibility = if (client.loggedIn) View.GONE else View.VISIBLE
+        tmActions.visibility = if (client.loggedIn) View.VISIBLE else View.GONE
+        tmText.text = when {
+            CookidooProgress.running -> CookidooProgress.text
+            client.loggedIn -> tr("Connecté : %s", a.prefs.cookidooEmail) + "\n" +
+                tr("%d recettes en français · %d en polonais", a.app.tmFr.count, a.app.tmPl.count) +
+                (if (a.prefs.cookidooResult.isNotEmpty()) "\n" + a.prefs.cookidooResult else "")
+            else -> tr("Non connecté")
+        }
+    }
+
     private fun renderReceiver() {
         val ip = Received.localIp()
         recvText.text = if (!a.prefs.receiverEnabled) tr("Réception désactivée.")
@@ -528,11 +607,15 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         // Synchro lancée ailleurs (nuit, autre écran) : son avancement s'affiche ici aussi.
         unsubProgress = SyncProgress.onChange { if (SyncProgress.running) syncText.text = SyncProgress.text else if (!syncing) refreshSync() }
         if (SyncProgress.running) syncText.text = SyncProgress.text
+        unsubTm = CookidooProgress.onChange { renderCookidoo() }
+        renderCookidoo()
     }
 
     override fun onHide() {
         unsubProgress?.invoke()
         unsubProgress = null
+        unsubTm?.invoke()
+        unsubTm = null
     }
 
     override fun onSnapshot(s: Snapshot) {

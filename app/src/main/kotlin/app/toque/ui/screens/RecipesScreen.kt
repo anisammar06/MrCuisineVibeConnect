@@ -20,6 +20,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import app.toque.Prefs
+import app.toque.recipes.CookidooClient
 import app.toque.core.i18n.I18n
 import app.toque.core.i18n.tr
 import app.toque.core.recipes.RecipeFilter
@@ -35,8 +36,19 @@ import java.util.concurrent.Executors
  * Catalogue des recettes Lidl : recherche instantanée tolérante (accents, pluriels, fautes de
  * frappe), filtres, et recherche par ingrédients (séparés par des virgules).
  */
-class RecipesScreen(a: MainActivity, private val focusSearch: Boolean = false, favorites: Boolean = false) : Screen(a) {
-    override val title = if (favorites) tr("Favoris") else tr("Recettes")
+class RecipesScreen(
+    a: MainActivity, private val focusSearch: Boolean = false, favorites: Boolean = false,
+    /** Catalogue Thermomix (Cookidoo converti) au lieu des recettes Lidl. */
+    private val thermomix: Boolean = false,
+) : Screen(a) {
+    override val title = if (thermomix) tr("Recettes Thermomix") else if (favorites) tr("Favoris") else tr("Recettes")
+
+    private val repo get() = if (thermomix) a.app.thermomix else a.app.recipes
+    private var lang: String
+        get() = if (thermomix) a.prefs.tmLang else a.prefs.recipeLang
+        set(v) {
+            if (thermomix) a.prefs.tmLang = v else a.prefs.recipeLang = v
+        }
 
     private var filter = RecipeFilter(favoritesOnly = favorites)
     private var query = ""
@@ -94,6 +106,11 @@ class RecipesScreen(a: MainActivity, private val focusSearch: Boolean = false, f
         langBox = Ui.horizontal(c)
         bar.addView(langBox, Ui.lp(Ui.WRAP, Ui.WRAP, l = 14))
         buildLang()
+        if (thermomix) {
+            bar.addView(Ui.button(c, tr("Cookidoo"), Ui.Style.PRIMARY, Icon.Kind.SEARCH, height = 56, textSize = 17f) {
+                a.push(CookidooSearchScreen(a, input.text.toString().trim()))
+            }, Ui.lp(Ui.WRAP, Ui.WRAP, l = 12))
+        }
         root.addView(bar)
 
         val scroller = HorizontalScrollView(c).apply { isHorizontalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER }
@@ -115,8 +132,8 @@ class RecipesScreen(a: MainActivity, private val focusSearch: Boolean = false, f
             adapter = this@RecipesScreen.adapter
             setOnItemClickListener { _, _, pos, _ ->
                 val hit = results.getOrNull(pos) ?: return@setOnItemClickListener
-                val r = a.app.recipes.get(hit.entry.id)
-                if (r != null) a.push(RecipeScreen(a, r))
+                val r = repo.get(hit.entry.id)
+                if (r != null) a.push(RecipeScreen(a, r, repo))
             }
             setOnScrollListener(object : AbsListView.OnScrollListener {
                 override fun onScrollStateChanged(v: AbsListView?, state: Int) {
@@ -137,19 +154,19 @@ class RecipesScreen(a: MainActivity, private val focusSearch: Boolean = false, f
 
     private fun buildLang() {
         langBox.removeAllViews()
-        val current = a.prefs.recipeLang
+        val current = lang
         for ((code, label) in listOf("fr" to "FR", "pl" to "PL")) {
             langBox.addView(Ui.toggleChip(c, label, current == code) { switchLang(code) }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 6))
         }
     }
 
     private fun switchLang(code: String) {
-        if (code == a.prefs.recipeLang) return
+        if (code == lang) return
         unsub?.invoke()
-        a.prefs.recipeLang = code
+        lang = code
         // Les catégories diffèrent d'une langue à l'autre : on garde seulement « Favoris » / durée.
         filter = RecipeFilter(favoritesOnly = filter.favoritesOnly, maxMinutes = filter.maxMinutes)
-        unsub = a.app.recipes.onChange { buildChips(); search() }
+        unsub = repo.onChange { buildChips(); search() }
         buildLang()
         buildChips()
         search()
@@ -164,14 +181,14 @@ class RecipesScreen(a: MainActivity, private val focusSearch: Boolean = false, f
         chip(tr("Toutes"), filter == base, base)
         chip(tr("Favoris"), filter.favoritesOnly, base.copy(favoritesOnly = true))
         chip(tr("30 min max"), filter.maxMinutes == 30, base.copy(maxMinutes = 30))
-        for (cat in a.app.recipes.index.categories.take(30)) chip(cat, filter.category == cat, base.copy(category = cat))
+        for (cat in repo.index.categories.take(30)) chip(cat, filter.category == cat, base.copy(category = cat))
     }
 
     private fun search() {
         val gen = ++generation
         val q = query
         val f = filter
-        val index = a.app.recipes.index
+        val index = repo.index
         searchExec.execute {
             val hits = if (q.contains(',')) index.withIngredients(q.split(','), f) else index.search(q, f)
             view.post {
@@ -184,11 +201,14 @@ class RecipesScreen(a: MainActivity, private val focusSearch: Boolean = false, f
     }
 
     private fun refreshEmpty() {
-        val repo = a.app.recipes
+        val repo = repo
         val none = repo.loaded && repo.count == 0
         count.text = if (results.isEmpty()) "" else if (results.size == 1) tr("1 recette") else tr("%d recettes", results.size)
         empty.visibility = if (results.isEmpty() && repo.loaded) View.VISIBLE else View.GONE
         emptyText.text = when {
+            none && thermomix && !CookidooClient(c).loggedIn ->
+                tr("Connectez votre compte Cookidoo : Réglages › Recettes Thermomix.\nLes recettes de vos listes Cookidoo arrivent en premier.")
+            none && thermomix -> tr("Les recettes Thermomix arrivent à la prochaine synchronisation.\nTouchez « Cookidoo » pour en chercher et en importer tout de suite.")
             none && a.prefs.recipeLang == "pl" && !a.prefs.syncPolish ->
                 tr("Le catalogue polonais n'est pas activé.\nRéglages › Recettes Lidl › Recettes en polonais aussi, puis Synchroniser.")
             none && a.prefs.recipeLang == "pl" ->
@@ -205,7 +225,7 @@ class RecipesScreen(a: MainActivity, private val focusSearch: Boolean = false, f
         buildLang()
         buildChips()
         search()
-        unsub = a.app.recipes.onChange { buildChips(); search() }
+        unsub = repo.onChange { buildChips(); search() }
         if (focusSearch) view.postDelayed({
             input.requestFocus()
             (c.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
@@ -273,10 +293,10 @@ class RecipesScreen(a: MainActivity, private val focusSearch: Boolean = false, f
             if (e.totalMinutes > 0) parts += "${e.totalMinutes} min"
             if (e.category.isNotBlank()) parts += e.category
             meta.text = parts.joinToString(" · ")
-            star.visibility = if (a.app.recipes.isFavorite(e.id)) View.VISIBLE else View.GONE
+            star.visibility = if (repo.isFavorite(e.id)) View.VISIBLE else View.GONE
             imageBox.background = Ui.gradient(Ui.placeholderColors(e.title), 0f)
             initials.text = Ui.initials(e.title)
-            ImageLoader.load(image, a.app.recipes.imageFile(e.image), Ui.u(260))
+            ImageLoader.load(image, repo.imageFile(e.image), Ui.u(260))
         }
     }
 }

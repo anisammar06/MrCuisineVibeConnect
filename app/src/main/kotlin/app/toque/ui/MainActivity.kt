@@ -91,6 +91,8 @@ class MainActivity : Activity() {
         app.machine.connect()
         app.recipesFr.load()
         app.recipesPl.load()
+        app.tmFr.load()
+        app.tmPl.load()
         ReceiverService.start(this)
         SyncService.schedule(this)
         push(HomeScreen(this))

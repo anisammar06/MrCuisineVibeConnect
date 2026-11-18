@@ -27,6 +27,18 @@ class ToqueApp : Application() {
 
     fun repo(lang: String): RecipeRepo = if (lang == "pl") recipesPl else recipesFr
 
+    /** Recettes Thermomix (Cookidoo) converties, en français et en polonais. */
+    val tmFr: RecipeRepo by lazy { RecipeRepo(this, "tm-fr") }
+    val tmPl: RecipeRepo by lazy { RecipeRepo(this, "tm-pl") }
+
+    fun tm(lang: String): RecipeRepo = if (lang == "pl") tmPl else tmFr
+
+    /** Catalogue Thermomix dans la langue choisie sur son écran (bouton FR | PL). */
+    val thermomix: RecipeRepo get() = tm(prefs.tmLang)
+
+    /** Catalogue qui contient une recette (pour reprendre une cuisson guidée). */
+    fun repoOf(id: String): RecipeRepo = listOf(recipesFr, recipesPl, tmFr, tmPl).firstOrNull { it.get(id) != null } ?: recipes
+
     /** Langues à synchroniser depuis monsieur-cuisine.com. */
     fun syncLangs(): List<String> = if (prefs.syncPolish) listOf("fr", "pl") else listOf("fr")
 

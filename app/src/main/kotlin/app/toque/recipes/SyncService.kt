@@ -19,9 +19,10 @@ import java.util.Calendar
 class SyncService : IntentService("toque-synchro") {
     override fun onHandleIntent(intent: Intent?) {
         val app = ToqueApp.of(this)
-        if (!app.prefs.autoSync) return
-        if (System.currentTimeMillis() - app.prefs.lastSyncMs < 6 * 3600_000L) return
-        OnlineSync.syncAll(this, app)
+        if (app.prefs.autoSync && System.currentTimeMillis() - app.prefs.lastSyncMs >= 6 * 3600_000L) OnlineSync.syncAll(this, app)
+        // Puis Cookidoo : listes du compte et un lot de nouvelles recettes Thermomix.
+        if (app.prefs.cookidooAuto && CookidooClient(this).loggedIn &&
+            System.currentTimeMillis() - app.prefs.cookidooLastMs >= 6 * 3600_000L) CookidooSync.run(this)
     }
 
     companion object {

@@ -20,7 +20,7 @@ import app.toque.ui.Screen
 import app.toque.ui.Ui
 
 /** Fiche recette : ingrédients à gauche, étapes à droite, « Cuisiner » pour le pas-à-pas. */
-class RecipeScreen(a: MainActivity, private val recipe: Recipe) : Screen(a) {
+class RecipeScreen(a: MainActivity, private val recipe: Recipe, private val repo: app.toque.recipes.RecipeRepo = a.app.recipes) : Screen(a) {
     override val title = recipe.title
     private lateinit var favIcon: Icon
     private lateinit var favLabel: TextView
@@ -41,7 +41,7 @@ class RecipeScreen(a: MainActivity, private val recipe: Recipe) : Screen(a) {
             override fun getOutline(view: View, outline: android.graphics.Outline) =
                 outline.setRoundRect(0, 0, view.width, view.height, Ui.uf(24f))
         }
-        ImageLoader.load(img, a.app.recipes.imageFile(recipe.image), Ui.u(420))
+        ImageLoader.load(img, repo.imageFile(recipe.image), Ui.u(420))
         left.addView(header, LinearLayout.LayoutParams(Ui.MATCH, Ui.u(170)))
 
         val meta = Ui.horizontal(c)
@@ -264,14 +264,14 @@ class RecipeScreen(a: MainActivity, private val recipe: Recipe) : Screen(a) {
     }
 
     private fun toggleFavorite() {
-        val now = !a.app.recipes.isFavorite(recipe.id)
-        a.app.recipes.setFavorite(recipe.id, now)
+        val now = !repo.isFavorite(recipe.id)
+        repo.setFavorite(recipe.id, now)
         refreshFavorite()
         a.toast(if (now) tr("Ajoutée aux favoris") else tr("Retirée des favoris"))
     }
 
     private fun refreshFavorite() {
-        val f = a.app.recipes.isFavorite(recipe.id)
+        val f = repo.isFavorite(recipe.id)
         favIcon.set(if (f) Icon.Kind.STAR_FILLED else Icon.Kind.STAR)
         favIcon.color = if (f) Ui.ACCENT else Ui.TEXT
         favLabel.text = tr("Favori")

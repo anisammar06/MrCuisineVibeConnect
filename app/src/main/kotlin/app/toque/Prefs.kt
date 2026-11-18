@@ -53,6 +53,76 @@ class Prefs(context: Context) {
             p.edit().putBoolean("syncPolish", v).commit()
         }
 
+    /** Langue des recettes Thermomix affichées : « fr » ou « pl ». */
+    var tmLang: String
+        get() = p.getString("tmLang", "fr") ?: "fr"
+        set(v) {
+            p.edit().putString("tmLang", v).commit()
+        }
+
+    /** Compte Cookidoo connecté (le mot de passe n'est jamais enregistré). */
+    var cookidooEmail: String
+        get() = p.getString("cookidooEmail", "") ?: ""
+        set(v) {
+            p.edit().putString("cookidooEmail", v).commit()
+        }
+
+    /** Jeton d'accès Cookidoo. */
+    var cookidooAccess: String
+        get() = p.getString("cookidooAccess", "") ?: ""
+        set(v) {
+            p.edit().putString("cookidooAccess", v).commit()
+        }
+
+    /** Jeton de renouvellement Cookidoo. */
+    var cookidooRefresh: String
+        get() = p.getString("cookidooRefresh", "") ?: ""
+        set(v) {
+            p.edit().putString("cookidooRefresh", v).commit()
+        }
+
+    /** Expiration du jeton d'accès (ms). */
+    var cookidooExpires: Long
+        get() = p.getLong("cookidooExpires", 0)
+        set(v) {
+            p.edit().putLong("cookidooExpires", v).commit()
+        }
+
+    /** Recettes Thermomix en polonais aussi. */
+    var cookidooPolish: Boolean
+        get() = p.getBoolean("cookidooPolish", true)
+        set(v) {
+            p.edit().putBoolean("cookidooPolish", v).commit()
+        }
+
+    /** Synchro Cookidoo chaque nuit (listes, puis un lot de nouvelles recettes). */
+    var cookidooAuto: Boolean
+        get() = p.getBoolean("cookidooAuto", true)
+        set(v) {
+            p.edit().putBoolean("cookidooAuto", v).commit()
+        }
+
+    /** Nouvelles recettes Cookidoo ajoutées à chaque synchro, par langue. */
+    var cookidooBatch: Int
+        get() = p.getInt("cookidooBatch", 150)
+        set(v) {
+            p.edit().putInt("cookidooBatch", v).commit()
+        }
+
+    /** Résultat de la dernière synchro Cookidoo. */
+    var cookidooResult: String
+        get() = p.getString("cookidooResult", "") ?: ""
+        set(v) {
+            p.edit().putString("cookidooResult", v).commit()
+        }
+
+    /** Heure de la dernière synchro Cookidoo. */
+    var cookidooLastMs: Long
+        get() = p.getLong("cookidooLastMs", 0)
+        set(v) {
+            p.edit().putLong("cookidooLastMs", v).commit()
+        }
+
     /** Réception des contenus envoyés depuis le téléphone (appli « Gotuj Send »). */
     var receiverEnabled: Boolean
         get() = p.getBoolean("receiverEnabled", true)
@@ -230,4 +300,10 @@ class Prefs(context: Context) {
         set(v) {
             p.edit().putInt("guidedStep", v).commit()
         }
+
+    /** Page de recherche Cookidoo où reprendre l'ajout progressif du catalogue. */
+    fun cookidooPage(lang: String): Int = p.getInt("cookidooPage_$lang", 0)
+    fun setCookidooPage(lang: String, page: Int) {
+        p.edit().putInt("cookidooPage_$lang", page).commit()
+    }
 }

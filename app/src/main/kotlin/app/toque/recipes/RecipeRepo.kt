@@ -98,6 +98,16 @@ class RecipeRepo(private val context: Context, val lang: String = "fr") {
         }
     }
 
+    /** Marque des recettes en favori sans recharger l'index (fait par [refresh]). */
+    fun addFavorites(ids: Collection<String>) {
+        if (ids.isEmpty()) return
+        synchronized(favorites) { favorites += ids }
+        exec.submit {
+            val db = helper.writableDatabase
+            for (id in ids) db.execSQL("INSERT OR IGNORE INTO favorites (id) VALUES (?)", arrayOf(id))
+        }.get()
+    }
+
     /**
      * Remplace tout le catalogue par l'import du jour (miroir de l'appli d'origine).
      * Les favoris sont conservés ; ceux marqués dans l'appli d'origine sont ajoutés.
