@@ -22,7 +22,7 @@ open class Listeners {
         return { main.post { list -= l } }
     }
 
-    fun notifyAll() {
+    fun changed() {
         main.post { for (l in ArrayList(list)) l() }
     }
 }
@@ -51,7 +51,7 @@ object Shopping : Listeners() {
             tmp.writeText(l.encode())
             tmp.renameTo(file)
         }
-        notifyAll()
+        changed()
         return r
     }
 }
@@ -91,7 +91,7 @@ object Timers : Listeners() {
             save()
         }
         schedule(c)
-        notifyAll()
+        changed()
         main.removeCallbacks(tick)
         main.post(tick)
         return r
@@ -121,7 +121,7 @@ object Timers : Listeners() {
             b.ringing(now)
         }
         if (ringing.isNotEmpty()) TimerRing.start(c) else TimerRing.stop(c)
-        notifyAll()
+        changed()
     }
 
     private fun schedule(c: Context) {
