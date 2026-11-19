@@ -56,6 +56,9 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
     private lateinit var iaUrl: TextView
     private lateinit var iaModelBox: LinearLayout
     private lateinit var iaVoiceBox: LinearLayout
+    private lateinit var iaVoiceBox2: LinearLayout
+    private lateinit var iaSpeedBox: LinearLayout
+    private lateinit var iaNameInfo: TextView
     private val voiceTick = object : Runnable {
         override fun run() {
             if (a.prefs.voiceEnabled && !voiceBusy) renderVoice()
@@ -306,6 +309,44 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         iaUrl = Ui.text(c, "", 15f, Ui.TEXT2).apply { setLineSpacing(0f, 1.15f) }
         iaQrRow.addView(iaUrl, Ui.lp(0, Ui.WRAP, 1f, l = 14))
         ia.addView(iaQrRow, Ui.lp(t = 8))
+        ia.addView(Ui.text(c, tr("Prénom de l'assistant (mot d'appel)"), 16f, Ui.TEXT2), Ui.lp(t = 12))
+        val nameRow = Ui.horizontal(c)
+        val nameEdit = EditText(c).apply {
+            setText(a.prefs.assistantName.replaceFirstChar { it.uppercase() })
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTextColor(Ui.TEXT)
+            setSingleLine()
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            hint = tr("ex. Léon")
+        }
+        nameRow.addView(nameEdit, Ui.lp(0, Ui.WRAP, 1f))
+        iaNameInfo = Ui.text(c, "", 14f, Ui.TEXT2).apply { setLineSpacing(0f, 1.12f) }
+        nameRow.addView(Ui.button(c, tr("Enregistrer"), Ui.Style.SECONDARY, null, height = 52) {
+            val name = nameEdit.text.toString().trim().lowercase()
+            if (name.contains(' ') || name.length < 2) {
+                iaNameInfo.text = tr("Un seul mot, au moins 2 lettres.")
+                return@button
+            }
+            val lang = a.prefs.voiceLang
+            iaNameInfo.text = tr("Vérification…")
+            Thread {
+                val known = VoiceModels.knows(a, lang, name)
+                view.post {
+                    when (known) {
+                        null -> iaNameInfo.text = tr("Téléchargez d'abord la voix hors ligne.")
+                        false -> iaNameInfo.text = tr("« %s » est inconnu de la reconnaissance hors ligne : choisissez un autre prénom.", name)
+                        true -> {
+                            a.prefs.assistantName = name
+                            VoiceService.restart(a.applicationContext)
+                            iaNameInfo.text = tr("C'est noté : dites « %s » pour parler à l'assistant.", name.replaceFirstChar { it.uppercase() }) +
+                                if (name.length <= 3) "\n" + tr("Un prénom court peut se déclencher par erreur ; 2 ou 3 syllabes, c'est mieux.") else ""
+                        }
+                    }
+                }
+            }.start()
+        }, Ui.lp(Ui.WRAP, Ui.WRAP, l = 10))
+        ia.addView(nameRow, Ui.lp(t = 6))
+        ia.addView(iaNameInfo, Ui.lp(t = 4))
         ia.addView(Ui.text(c, tr("Ville (météo et recherches locales)"), 16f, Ui.TEXT2), Ui.lp(t = 12))
         val cityRow = Ui.horizontal(c)
         val city = EditText(c).apply {
@@ -325,9 +366,15 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         ia.addView(Ui.text(c, tr("Modèle"), 16f, Ui.TEXT2), Ui.lp(t = 12))
         iaModelBox = Ui.horizontal(c)
         ia.addView(iaModelBox, Ui.lp(t = 6))
-        ia.addView(Ui.text(c, tr("Voix"), 16f, Ui.TEXT2), Ui.lp(t = 12))
+        ia.addView(Ui.text(c, tr("Voix de femme"), 16f, Ui.TEXT2), Ui.lp(t = 12))
         iaVoiceBox = Ui.horizontal(c)
         ia.addView(iaVoiceBox, Ui.lp(t = 6))
+        ia.addView(Ui.text(c, tr("Voix d'homme"), 16f, Ui.TEXT2), Ui.lp(t = 10))
+        iaVoiceBox2 = Ui.horizontal(c)
+        ia.addView(iaVoiceBox2, Ui.lp(t = 6))
+        ia.addView(Ui.text(c, tr("Vitesse de lecture"), 16f, Ui.TEXT2), Ui.lp(t = 12))
+        iaSpeedBox = Ui.horizontal(c)
+        ia.addView(iaSpeedBox, Ui.lp(t = 6))
         val iaBtns = Ui.horizontal(c)
         iaBtns.addView(Ui.button(c, tr("Tester la voix"), Ui.Style.SECONDARY, Icon.Kind.PLAY, height = 52) {
             Assistant.say(a, if (a.prefs.voiceLang == "pl") "Cześć! Co dziś gotujemy?" else "Bonjour ! Qu'est-ce qu'on cuisine aujourd'hui ?")
@@ -619,7 +666,7 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         iaText.text = tr("Clé Anthropic : %s · Clé OpenAI : %s", mark(p.anthropicKey.isNotBlank()), mark(p.openaiKey.isNotBlank())) + "\n" +
             when {
                 !p.voiceEnabled -> tr("Activez aussi la commande vocale (mot d'appel « robot »).")
-                p.assistantReady -> tr("Prêt : dites « robot » puis votre question.")
+                p.assistantReady -> tr("Prêt : dites « %s » puis votre question.", p.assistantName.replaceFirstChar { it.uppercase() })
                 p.assistantEnabled -> tr("Saisissez les clés depuis le téléphone (code QR).")
                 else -> ""
             }
@@ -640,11 +687,23 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
                 renderAssistant()
             }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
         }
-        iaVoiceBox.removeAllViews()
-        for (v in listOf("coral", "marin", "cedar", "nova")) {
-            iaVoiceBox.addView(Ui.toggleChip(c, v.replaceFirstChar { it.uppercase() }, p.assistantVoice == v) {
-                p.assistantVoice = v
+        val sample = { if (p.voiceLang == "pl") "Cześć! Co dziś gotujemy?" else "Bonjour ! Qu'est-ce qu'on cuisine aujourd'hui ?" }
+        for ((box, voices) in listOf(iaVoiceBox to listOf("coral", "nova", "shimmer", "marin"), iaVoiceBox2 to listOf("ash", "echo", "onyx", "cedar"))) {
+            box.removeAllViews()
+            for (v in voices) {
+                box.addView(Ui.toggleChip(c, v.replaceFirstChar { it.uppercase() }, p.assistantVoice == v) {
+                    p.assistantVoice = v
+                    renderAssistant()
+                    Assistant.say(a, sample())
+                }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 8))
+            }
+        }
+        iaSpeedBox.removeAllViews()
+        for ((sp, label) in listOf(100 to tr("Normale"), 115 to tr("Un peu rapide"), 130 to tr("Rapide"), 150 to tr("Très rapide"))) {
+            iaSpeedBox.addView(Ui.toggleChip(c, label, p.assistantSpeed == sp) {
+                p.assistantSpeed = sp
                 renderAssistant()
+                Assistant.say(a, sample())
             }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 8))
         }
     }

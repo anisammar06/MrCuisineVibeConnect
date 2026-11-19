@@ -55,5 +55,10 @@ class VoiceTest {
         assertEquals(emptyList<String>(), Voice.afterWake("robot", "fr"))
         assertNull(Voice.afterWake("pause", "fr"))
         assertEquals(listOf("pauza"), Voice.afterWake("robocie pauza", "pl"))
+        val leon = Voice.wakeWords(" Léon ", "fr")
+        assertEquals(listOf("léon"), leon)
+        assertEquals(listOf("pause"), Voice.afterWake("léon pause", "fr", leon))
+        assertNull(Voice.afterWake("robot pause", "fr", leon))
+        assertEquals(Voice.WAKE["fr"], Voice.wakeWords("Robot", "fr"))
     }
 }

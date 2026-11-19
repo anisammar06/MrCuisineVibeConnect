@@ -98,8 +98,9 @@ object Assistant {
         val data = wav.readBytes()
         var last = ""
         for (model in listOf("gpt-transcribe", "gpt-4o-mini-transcribe")) {
+            val name = Prefs(c).assistantName.replaceFirstChar { it.uppercase() }
             val body = Net.Multipart().field("model", model).field("language", lang)
-                .field("prompt", if (lang == "pl") "Robot kuchenny, przepisy, minutnik." else "Robot de cuisine, recettes, minuteur.")
+                .field("prompt", if (lang == "pl") "$name, robot kuchenny, przepisy, minutnik." else "$name, robot de cuisine, recettes, minuteur.")
                 .file("file", "question.wav", "audio/wav", data)
             val r = Net.post(c, "https://api.openai.com/v1/audio/transcriptions",
                 mapOf("Authorization" to "Bearer $key"), body.bytes(), body.type, 45_000)
@@ -192,14 +193,15 @@ object Assistant {
         }
         val spoken = if (lang == "pl") "polonais" else "français"
         val city = Prefs(c).assistantCity.ifBlank { "inconnue (demande-la si besoin, ou utilise le fuseau horaire)" }
-        return """Tu es l'assistant vocal de la famille, intégré à leur robot de cuisine Monsieur Cuisine Connect (appli « Gotuj z Kasią »). Tu es un assistant généraliste : on peut te parler de n'importe quel sujet (cuisine, météo, actualité, culture, devoirs, conseils, calculs, traductions, discussion…) et tu réponds avec plaisir, comme Claude.
+        val name = Prefs(c).assistantName.replaceFirstChar { it.uppercase() }
+        return """Tu t'appelles $name. Tu es l'assistant vocal de la famille, intégré à leur robot de cuisine Monsieur Cuisine Connect (appli « Gotuj z Kasią »). Tu es un assistant généraliste : on peut te parler de n'importe quel sujet (cuisine, météo, actualité, culture, devoirs, conseils, calculs, traductions, discussion…) et tu réponds avec plaisir, comme Claude.
 Ta réponse est LUE À VOIX HAUTE : phrases naturelles, pas de liste à puces, pas de markdown, pas d'emoji, pas d'URL ni d'identifiants. Sois bref par défaut (1 à 4 phrases) ; développe davantage seulement si on te le demande ou si le sujet l'exige, sans dépasser une minute de lecture. Pour proposer des plats, 2 ou 3 idées maximum, chacune en quelques mots.
 Réponds dans la langue de la personne (on t'a parlé en $spoken ; si elle parle polonais, réponds en polonais).
-La phrase vient d'une transcription automatique : elle peut contenir des fautes ou commencer par « robot » ; devine le sens.
+La phrase vient d'une transcription automatique : elle peut contenir des fautes ou commencer par ton prénom « $name » ; devine le sens.
 Pour la météo, l'actualité, les horaires, les prix, les résultats sportifs ou tout ce qui peut avoir changé, utilise la recherche web (web_search) plutôt que ta mémoire. Ville de la famille : $city.
 Pour la cuisine, utilise les outils des recettes du robot (Lidl et Thermomix, français et polonais) et l'historique de ce qui a été cuisiné, pour proposer des choses variées (évite ce qui a été fait ces derniers jours, sauf demande). Quand la personne choisit une recette, ouvre-la à l'écran avec open_recipe. Tu peux aussi lancer des minuteurs, gérer la liste de courses et la musique.
 SÉCURITÉ : tu ne peux jamais démarrer le moteur, chauffer ou lancer une étape ; c'est la personne qui appuie sur Démarrer à l'écran. Tu peux seulement mettre en pause ou arrêter.
-Si tu poses une question, la personne peut répondre directement sans redire « robot ».
+Si tu poses une question, la personne peut répondre directement sans redire ton prénom.
 Contexte : nous sommes le $day. Écran affiché : ${screen.ifEmpty { "accueil" }}. Robot : $machine. Minuteurs en cours : ${timers.ifEmpty { "aucun" }}."""
     }
 
@@ -220,7 +222,7 @@ Contexte : nous sommes le $day. Écran affiché : ${screen.ifEmpty { "accueil" }
                 "model" to "gpt-4o-mini-tts",
                 "voice" to p.assistantVoice,
                 "input" to text.take(3000),
-                "instructions" to if (lang == "pl") "Mów po polsku, ciepło i naturalnie, w spokojnym tempie." else "Parle en français, d'une voix chaleureuse et naturelle, à un rythme posé.",
+                "instructions" to if (lang == "pl") "Mów po polsku, ciepło i naturalnie, w żywym tempie, bez długich pauz." else "Parle en français, d'une voix chaleureuse et naturelle, à un rythme vif, sans longues pauses.",
                 "response_format" to "mp3",
             )
             val r = Net.post(c, "https://api.openai.com/v1/audio/speech", mapOf("Authorization" to "Bearer ${p.openaiKey}"),
@@ -247,8 +249,15 @@ Contexte : nous sommes le $day. Écran affiché : ${screen.ifEmpty { "accueil" }
             mp.setOnCompletionListener { done.countDown() }
             mp.setOnErrorListener { _, _, _ -> done.countDown(); true }
             mp.prepare()
+            val speed = Prefs(c).assistantSpeed.coerceIn(80, 200) / 100f
+            if (speed != 1f) {
+                try {
+                    mp.playbackParams = mp.playbackParams.setSpeed(speed).setPitch(1f)
+                } catch (_: Exception) {
+                }
+            }
             mp.start()
-            done.await(maxOf(5_000L, mp.duration.toLong() + 3_000), TimeUnit.MILLISECONDS)
+            done.await(maxOf(5_000L, (mp.duration / speed).toLong() + 3_000), TimeUnit.MILLISECONDS)
         } finally {
             mp.release()
             @Suppress("DEPRECATION")
@@ -271,6 +280,7 @@ Contexte : nous sommes le $day. Écran affiché : ${screen.ifEmpty { "accueil" }
         val engine = tts ?: return
         try {
             engine.language = if (lang == "pl") Locale("pl", "PL") else Locale.FRANCE
+            engine.setSpeechRate(Prefs(c).assistantSpeed.coerceIn(80, 200) / 100f)
             val done = CountDownLatch(1)
             engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(id: String?) {}

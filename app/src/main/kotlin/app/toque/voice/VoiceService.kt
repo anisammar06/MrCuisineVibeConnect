@@ -71,7 +71,8 @@ class VoiceService : Service() {
             stopSelf()
             return
         }
-        val grammar = Json.write(Voice.grammar(lang))
+        val wake = Voice.wakeWords(Prefs(this).assistantName, lang)
+        val grammar = Json.write(Voice.grammar(lang, wake))
         val beep = try {
             ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
         } catch (_: RuntimeException) {
@@ -150,14 +151,14 @@ class VoiceService : Service() {
                         ask(ring, total, segStart, lang, "")
                         continue
                     }
-                    val after = Voice.afterWake(text, lang)
+                    val after = Voice.afterWake(text, lang, wake)
                     val words: List<String>? = when {
                         after != null -> after
                         !requireWake || now < awaitUntil -> text.split(' ')
                         else -> null
                     }
                     if (words == null) {
-                        heard(text, "ignoré (pas de « robot »)")
+                        heard(text, "ignoré (pas de « ${wake.first()} »)")
                         continue
                     }
                     val clean = words.filter { it != "[unk]" }
@@ -167,7 +168,7 @@ class VoiceService : Service() {
                     // force une phrase libre sur des mots de commande (« j'ai faim » → « lecture »).
                     // Le texte local sert de secours si Internet ne répond pas.
                     if (assistant) {
-                        val alone = after != null && raw(text).dropWhile { it !in Voice.WAKE[lang].orEmpty() }.drop(1).isEmpty()
+                        val alone = after != null && raw(text).dropWhile { it !in wake }.drop(1).isEmpty()
                         if (alone) {
                             // Le moteur coupe souvent juste après « robot » alors que la phrase continue :
                             // on garde le son depuis le début de ce morceau pour ne pas en perdre le début.
@@ -358,6 +359,42 @@ object VoiceModels {
 
     fun dir(c: Context, lang: String) = File(c.filesDir, "voix/$lang")
     fun installed(c: Context, lang: String) = File(dir(c, lang), "am/final.mdl").exists()
+
+    /**
+     * Le mot existe-t-il dans le vocabulaire du modèle hors ligne ? (null : modèle absent)
+     * La table des mots est rangée dans graph/Gr.fst sous la forme [longueur 32 bits][octets] :
+     * on cherche cette séquence exacte, ce qui évite de confondre « chef » et « chefs ».
+     */
+    fun knows(c: Context, lang: String, word: String): Boolean? {
+        val f = File(dir(c, lang), "graph/Gr.fst")
+        if (!f.exists()) return null
+        val w = word.trim().lowercase().toByteArray(Charsets.UTF_8)
+        if (w.isEmpty()) return false
+        val pat = ByteArray(4 + w.size)
+        pat[0] = w.size.toByte(); pat[1] = (w.size shr 8).toByte(); pat[2] = (w.size shr 16).toByte(); pat[3] = (w.size shr 24).toByte()
+        System.arraycopy(w, 0, pat, 4, w.size)
+        val buf = ByteArray(1 shl 20)
+        var keep = 0
+        f.inputStream().use { input ->
+            while (true) {
+                val n = input.read(buf, keep, buf.size - keep)
+                if (n <= 0) break
+                val len = keep + n
+                var i = 0
+                while (i <= len - pat.size) {
+                    if (buf[i] == pat[0]) {
+                        var k = 1
+                        while (k < pat.size && buf[i + k] == pat[k]) k++
+                        if (k == pat.size) return true
+                    }
+                    i++
+                }
+                keep = minOf(pat.size - 1, len)
+                System.arraycopy(buf, len - keep, buf, 0, keep)
+            }
+        }
+        return false
+    }
 
     /** Télécharge et décompresse un modèle ; [progress] reçoit un pourcentage. */
     fun download(c: Context, lang: String, progress: (Int) -> Unit) {

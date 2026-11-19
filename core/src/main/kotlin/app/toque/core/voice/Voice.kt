@@ -33,6 +33,12 @@ object Voice {
     // « repos » n'est pas un nom de minuteur : le petit modèle français le confond avec « robot ».
     val WAKE = mapOf("fr" to listOf("robot", "robots"), "pl" to listOf("robot", "robocie", "robota"))
 
+    /** Mots d'appel : le prénom choisi pour l'assistant, ou « robot » par défaut. */
+    fun wakeWords(name: String, lang: String): List<String> {
+        val n = name.trim().lowercase()
+        return if (n.isEmpty() || n == "robot") WAKE[lang].orEmpty() else listOf(n)
+    }
+
     private val FR_UNITS = mapOf(
         "zéro" to 0, "un" to 1, "une" to 1, "deux" to 2, "trois" to 3, "quatre" to 4, "cinq" to 5, "six" to 6, "sept" to 7,
         "huit" to 8, "neuf" to 9, "dix" to 10, "onze" to 11, "douze" to 12, "treize" to 13, "quatorze" to 14, "quinze" to 15,
@@ -73,9 +79,9 @@ object Voice {
     )
 
     /** Mots que le moteur doit chercher (plus « [unk] » pour tout le reste). */
-    fun grammar(lang: String): List<String> {
+    fun grammar(lang: String, wake: List<String> = WAKE[lang].orEmpty()): List<String> {
         val words = LinkedHashSet<String>()
-        words += WAKE[lang].orEmpty()
+        words += wake
         if (lang == "pl") {
             words += PL_WORDS; words += PL_UNITS.keys; words += PL_NAMES.keys
         } else {
@@ -91,9 +97,9 @@ object Voice {
         text.lowercase().replace('’', '\'').replace("-", " ").split(Regex("[\\s,.!?]+")).filter { it.isNotEmpty() && it != "[unk]" }
 
     /** Le texte commence-t-il par le mot d'appel ? Renvoie le reste de la phrase, ou null. */
-    fun afterWake(text: String, lang: String): List<String>? {
+    fun afterWake(text: String, lang: String, wake: List<String> = WAKE[lang].orEmpty()): List<String>? {
         val t = tokens(text)
-        val i = t.indexOfFirst { it in WAKE[lang].orEmpty() }
+        val i = t.indexOfFirst { it in wake }
         if (i < 0) return null
         return t.drop(i + 1)
     }

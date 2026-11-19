@@ -356,6 +356,20 @@ class Prefs(context: Context) {
             p.edit().putString("assistantVoice", v).commit()
         }
 
+    /** Prénom de l'assistant, qui sert aussi de mot d'appel (« robot » par défaut). */
+    var assistantName: String
+        get() = p.getString("assistantName", "robot")?.ifBlank { "robot" } ?: "robot"
+        set(v) {
+            p.edit().putString("assistantName", v).commit()
+        }
+
+    /** Vitesse de lecture des réponses, en pourcentage (100 = normale). */
+    var assistantSpeed: Int
+        get() = p.getInt("assistantSpeed", 115)
+        set(v) {
+            p.edit().putInt("assistantSpeed", v).commit()
+        }
+
     /** Ville pour la météo et les recherches locales de l'assistant. */
     var assistantCity: String
         get() = p.getString("assistantCity", "") ?: ""
