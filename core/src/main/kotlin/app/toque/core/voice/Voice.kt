@@ -46,6 +46,10 @@ object Voice {
         "dziewięćdziesiąt" to 90,
     )
 
+    private val PL_HOURS = setOf("godzina", "godziny", "godzin", "godzinę")
+    private val PL_MINUTES = setOf("minuta", "minuty", "minut", "minutę")
+    private val PL_SECONDS = setOf("sekunda", "sekundy", "sekund", "sekundę")
+
     /** Noms de minuteur reconnus → nom affiché. */
     private val FR_NAMES = mapOf("pâtes" to "Pâtes", "riz" to "Riz", "four" to "Four", "œufs" to "Œufs", "oeufs" to "Œufs",
         "œuf" to "Œufs", "légumes" to "Légumes", "repos" to "Repos", "gâteau" to "Gâteau", "viande" to "Viande",
@@ -155,9 +159,9 @@ object Voice {
                     n = if ((w == "vingt" || w == "vingts") && prev == "quatre") n - 4 + 80 else n + v
                     have = true
                 }
-                w.startsWith("heure") -> { total += (if (have) n else 1) * 3600; n = 0; have = false }
-                w.startsWith("minute") -> { total += (if (have) n else 1) * 60; n = 0; have = false }
-                w.startsWith("seconde") -> { total += if (have) n else 1; n = 0; have = false }
+                (w == "heure" || w == "heures") -> { total += (if (have) n else 1) * 3600; n = 0; have = false }
+                (w == "minute" || w == "minutes") -> { total += (if (have) n else 1) * 60; n = 0; have = false }
+                (w == "seconde" || w == "secondes") -> { total += if (have) n else 1; n = 0; have = false }
                 w == "demie" || w == "demi" -> total += if (prev == "et" && total >= 3600 && total % 3600 == 0) 1800 else 30
             }
             prev = w
@@ -180,9 +184,9 @@ object Voice {
                 v != null -> { n += v; have = true }
                 w == "pół" -> half = true
                 w == "półtorej" -> oneAndHalf = true
-                w.startsWith("godzin") -> { total += unit(n, have, half, oneAndHalf, 3600); n = 0; have = false; half = false; oneAndHalf = false }
-                w.startsWith("minut") -> { total += unit(n, have, half, oneAndHalf, 60); n = 0; have = false; half = false; oneAndHalf = false }
-                w.startsWith("sekund") -> { total += unit(n, have, half, oneAndHalf, 1); n = 0; have = false; half = false; oneAndHalf = false }
+                w in PL_HOURS -> { total += unit(n, have, half, oneAndHalf, 3600); n = 0; have = false; half = false; oneAndHalf = false }
+                w in PL_MINUTES -> { total += unit(n, have, half, oneAndHalf, 60); n = 0; have = false; half = false; oneAndHalf = false }
+                w in PL_SECONDS -> { total += unit(n, have, half, oneAndHalf, 1); n = 0; have = false; half = false; oneAndHalf = false }
             }
         }
         if (have && n > 0) total += n * 60
