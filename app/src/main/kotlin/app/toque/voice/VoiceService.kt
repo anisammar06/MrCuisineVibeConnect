@@ -172,6 +172,25 @@ object VoiceModels {
         "pl" to "https://alphacephei.com/vosk/models/vosk-model-small-pl-0.22.zip",
     )
 
+    /**
+     * Empreintes SHA-256 des modèles. Le site utilise la nouvelle chaîne Let's Encrypt (« Root YR »),
+     * inconnue d'Android 6 : la connexion est acceptée sans vérifier le certificat, mais le fichier
+     * reçu doit avoir exactement cette empreinte, sinon il est rejeté.
+     */
+    private val SHA256 = mapOf(
+        "fr" to "cabf6180e177eb9b3a9a9d43a437bd5e549f3a7d09525e5d69a3fed787be12ad",
+        "pl" to "c4cd16498ea544f446f9e9a55cbd602b71cfe5a2b6f2b0834d81e1b6fce15f0d",
+    )
+
+    private val trustAll: javax.net.ssl.SSLSocketFactory by lazy {
+        val tm = object : javax.net.ssl.X509TrustManager {
+            override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) {}
+            override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) {}
+            override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
+        }
+        javax.net.ssl.SSLContext.getInstance("TLS").apply { init(null, arrayOf(tm), null) }.socketFactory
+    }
+
     fun dir(c: Context, lang: String) = File(c.filesDir, "voix/$lang")
     fun installed(c: Context, lang: String) = File(dir(c, lang), "am/final.mdl").exists()
 
@@ -179,7 +198,7 @@ object VoiceModels {
     fun download(c: Context, lang: String, progress: (Int) -> Unit) {
         val url = URLS[lang] ?: throw IllegalArgumentException(lang)
         val conn = URL(url).openConnection() as HttpsURLConnection
-        conn.sslSocketFactory = app.toque.recipes.CookidooClient.sslFactory(c)
+        conn.sslSocketFactory = trustAll
         conn.connectTimeout = 20_000
         conn.readTimeout = 60_000
         if (conn.responseCode != 200) throw java.io.IOException("HTTP ${conn.responseCode}")
@@ -188,27 +207,37 @@ object VoiceModels {
         tmp.deleteRecursively()
         tmp.mkdirs()
         var read = 0L
-        val counting = object : java.io.FilterInputStream(conn.inputStream) {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        val counting = object : java.io.FilterInputStream(java.security.DigestInputStream(conn.inputStream, digest)) {
             override fun read(b: ByteArray, off: Int, len: Int): Int {
                 val n = super.read(b, off, len)
                 if (n > 0) { read += n; progress((read * 100 / total).toInt().coerceIn(0, 99)) }
                 return n
             }
         }
-        ZipInputStream(counting.buffered()).use { zip ->
-            while (true) {
-                val e = zip.nextEntry ?: break
-                // Le zip contient un dossier « vosk-model-small-xx-0.22/ » : on le retire.
-                val rel = e.name.substringAfter('/', "")
-                if (rel.isEmpty() || rel.contains("..")) continue
-                val f = File(tmp, rel)
-                if (e.isDirectory) f.mkdirs() else {
-                    f.parentFile?.mkdirs()
-                    FileOutputStream(f).use { zip.copyTo(it) }
-                }
+        val buffered = counting.buffered()
+        val zip = ZipInputStream(buffered)
+        while (true) {
+            val e = zip.nextEntry ?: break
+            // Le zip contient un dossier « vosk-model-small-xx-0.22/ » : on le retire.
+            val rel = e.name.substringAfter('/', "")
+            if (rel.isEmpty() || rel.contains("..")) continue
+            val f = File(tmp, rel)
+            if (e.isDirectory) f.mkdirs() else {
+                f.parentFile?.mkdirs()
+                FileOutputStream(f).use { zip.copyTo(it) }
             }
         }
+        // Lire la fin du fichier (répertoire du zip) pour que l'empreinte le couvre en entier.
+        val rest = ByteArray(16384)
+        while (buffered.read(rest, 0, rest.size) >= 0) { }
+        zip.close()
         conn.disconnect()
+        val hash = digest.digest().joinToString("") { "%02x".format(it) }
+        if (hash != SHA256[lang]) {
+            tmp.deleteRecursively()
+            throw java.io.IOException("fichier de la voix altéré (empreinte inattendue)")
+        }
         val dest = dir(c, lang)
         dest.deleteRecursively()
         if (!tmp.renameTo(dest)) throw java.io.IOException("installation du modèle impossible")
