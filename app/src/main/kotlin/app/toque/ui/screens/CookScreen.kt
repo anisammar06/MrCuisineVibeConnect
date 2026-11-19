@@ -104,6 +104,10 @@ class CookScreen(a: MainActivity, private val recipe: Recipe, startStep: Int) : 
         return root
     }
 
+    /** Commande vocale « étape suivante » / « précédente ». */
+    fun voiceNext() = next()
+    fun voicePrev() = go(index - 1)
+
     private fun next() {
         if (index >= recipe.steps.size - 1) {
             a.prefs.guidedRecipe = ""

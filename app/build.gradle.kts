@@ -15,8 +15,10 @@ android {
         targetSdk = 28
         // Pour publier une mise à jour : augmenter les deux valeurs puis pousser sur GitHub
         // (la version est publiée automatiquement, voir .github/workflows/release.yml).
-        versionCode = 18
-        versionName = "0.11.1"
+        versionCode = 19
+        versionName = "0.12.0"
+        // Le robot est un ARMv7 : inutile d'embarquer les bibliothèques natives des autres processeurs.
+        ndk { abiFilters += "armeabi-v7a" }
     }
 
     signingConfigs {
@@ -68,4 +70,7 @@ dependencies {
     implementation(project(":core"))
     // Code QR de la liste de courses (bibliothèque Java pure, sans AndroidX).
     implementation("com.google.zxing:core:3.5.3")
+    // Reconnaissance vocale hors ligne (Vosk), modèles FR et PL téléchargés depuis les réglages.
+    implementation("com.alphacephei:vosk-android:0.3.47@aar")
+    implementation("net.java.dev.jna:jna:5.13.0@aar")
 }

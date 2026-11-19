@@ -301,6 +301,27 @@ class Prefs(context: Context) {
             p.edit().putInt("guidedStep", v).commit()
         }
 
+    /** Commande vocale hors ligne. */
+    var voiceEnabled: Boolean
+        get() = p.getBoolean("voiceEnabled", false)
+        set(v) {
+            p.edit().putBoolean("voiceEnabled", v).commit()
+        }
+
+    /** Langue écoutée : « fr » ou « pl » (un seul modèle à la fois, pour la mémoire du robot). */
+    var voiceLang: String
+        get() = p.getString("voiceLang", "fr") ?: "fr"
+        set(v) {
+            p.edit().putString("voiceLang", v).commit()
+        }
+
+    /** Mot d'appel « robot » obligatoire avant une commande. */
+    var voiceWake: Boolean
+        get() = p.getBoolean("voiceWake", true)
+        set(v) {
+            p.edit().putBoolean("voiceWake", v).commit()
+        }
+
     /** Enceinte Spotify Connect sur le robot. */
     var spotifyEnabled: Boolean
         get() = p.getBoolean("spotifyEnabled", true)

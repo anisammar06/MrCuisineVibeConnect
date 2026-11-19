@@ -20,6 +20,9 @@ object MicTest {
         busy = true
         Thread {
             try {
+                // La commande vocale libère le micro le temps du test.
+                app.toque.voice.VoiceService.pauseFor(c, 7_000)
+                Thread.sleep(700)
                 result(tr("Écoute… parlez maintenant."))
                 result(listen(c, level))
             } finally {

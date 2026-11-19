@@ -3,6 +3,7 @@ package app.toque.ui
 import app.toque.ui.screens.SpotifyScreen
 import app.toque.media.SpotifyService
 import app.toque.media.MediaRemote
+import app.toque.voice.VoiceService
 import app.toque.recipes.CookidooClient
 import app.toque.recipes.CookidooSync
 import app.toque.kitchen.Timers
@@ -105,6 +106,8 @@ class MainActivity : Activity() {
         ReceiverService.start(this)
         SpotifyService.start(applicationContext)
         MediaRemote.start(applicationContext)
+        VoiceService.start(applicationContext)
+        instance = this
         SyncService.schedule(this)
         push(HomeScreen(this))
         handleOpen(intent)
@@ -147,8 +150,19 @@ class MainActivity : Activity() {
         topBar.startClock()
     }
 
+    /** Activité au premier plan (pour la commande vocale). */
+    var resumed = false
+        private set
+
+    override fun onPause() {
+        resumed = false
+        super.onPause()
+    }
+
     override fun onResume() {
         super.onResume()
+        resumed = true
+        instance = this
         immersive()
         prefs.returnBubble = false
         ReturnBubble.stop(this)
@@ -164,6 +178,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        if (instance === this) instance = null
         tone?.release()
         super.onDestroy()
     }
@@ -475,6 +490,8 @@ class MainActivity : Activity() {
 
     companion object {
         const val EXTRA_OPEN = "app.toque.OUVRIR"
+        /** Dernière activité affichée (commande vocale : étape suivante, messages). */
+        @Volatile var instance: MainActivity? = null
         private var reopenSettings = false
 
         /** MotionEvent.AXIS_SCROLL (API 26), valeur fixe pour Android 6. */

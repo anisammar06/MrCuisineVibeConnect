@@ -30,6 +30,8 @@ import app.toque.media.Received
 import app.toque.media.ReceiverService
 import app.toque.media.SpotifyService
 import app.toque.media.MicTest
+import app.toque.voice.VoiceModels
+import app.toque.voice.VoiceService
 import app.toque.ui.Icon
 import app.toque.ui.MainActivity
 import app.toque.ui.Screen
@@ -44,6 +46,10 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
     private lateinit var port: EditText
     private lateinit var syncText: TextView
     private lateinit var tmText: TextView
+    private lateinit var voiceLangBox: LinearLayout
+    private lateinit var voiceText: TextView
+    private lateinit var voiceBtn: LinearLayout
+    private var voiceBusy = false
     private lateinit var tmLogin: LinearLayout
     private lateinit var tmActions: LinearLayout
     private var unsubTm: (() -> Unit)? = null
@@ -228,6 +234,30 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
                 a.toast(tr("Compte Spotify délié"), Ui.OK)
             }
         }, Ui.lp(Ui.WRAP, Ui.WRAP, t = 10))
+
+        // ---- Commande vocale
+        val vo = section(right, tr("Commande vocale"), Icon.Kind.PLAY)
+        vo.addView(Ui.text(c, tr("Hors ligne : rien n'est envoyé sur Internet. Dites « robot » puis la commande, par exemple « robot, minuteur pâtes huit minutes » ou « robot, étape suivante ». La voix peut mettre en pause ou arrêter une cuisson, jamais démarrer le moteur."),
+            15f, Ui.TEXT2).apply { setLineSpacing(0f, 1.15f) })
+        vo.addView(toggle(tr("Commande vocale activée"), a.prefs.voiceEnabled) { on ->
+            a.prefs.voiceEnabled = on
+            if (on) VoiceService.start(a.applicationContext) else VoiceService.stop(a.applicationContext)
+            renderVoice()
+        }, Ui.lp(t = 10))
+        vo.addView(toggle(tr("Mot d'appel « robot » obligatoire"), a.prefs.voiceWake) { on ->
+            a.prefs.voiceWake = on
+            VoiceService.restart(a.applicationContext)
+        }, Ui.lp(t = 10))
+        vo.addView(Ui.text(c, tr("Langue écoutée (une à la fois)"), 16f, Ui.TEXT2), Ui.lp(t = 12))
+        voiceLangBox = Ui.horizontal(c)
+        vo.addView(voiceLangBox, Ui.lp(t = 6))
+        voiceText = Ui.text(c, "", 15f, Ui.TEXT).apply { setLineSpacing(0f, 1.15f) }
+        vo.addView(voiceText, Ui.lp(t = 10))
+        voiceBtn = Ui.button(c, tr("Télécharger la voix"), Ui.Style.SECONDARY, Icon.Kind.SYNC, height = 52) { downloadVoice() }
+        vo.addView(voiceBtn, Ui.lp(Ui.WRAP, Ui.WRAP, t = 8))
+        vo.addView(Ui.text(c, tr("Commandes : minuteur [nom] [durée] · arrête le minuteur · étape suivante / précédente · suivant · précédent · pause · stop · lecture · plus fort · moins fort.\nPolski : minutnik [nazwa] [czas] · wyłącz minutnik · następny krok · poprzedni krok · pauza · stop · graj · głośniej · ciszej."),
+            14f, Ui.TEXT3).apply { setLineSpacing(0f, 1.12f) }, Ui.lp(t = 10))
+        renderVoice()
 
         // ---- Micro
         val mic = section(right, tr("Micro"), Icon.Kind.PLAY)
@@ -497,6 +527,49 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
                 settingTime = false
                 refreshTime(if (r.ok) null else r.message)
                 if (r.ok) a.toast(r.message, Ui.OK)
+            }
+        }.start()
+    }
+
+    private fun renderVoice() {
+        voiceLangBox.removeAllViews()
+        for ((code, label) in listOf("fr" to "Français", "pl" to "Polski")) {
+            voiceLangBox.addView(Ui.toggleChip(c, label, a.prefs.voiceLang == code) {
+                a.prefs.voiceLang = code
+                VoiceService.restart(a.applicationContext)
+                renderVoice()
+            }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 8))
+        }
+        val lang = a.prefs.voiceLang
+        val ok = VoiceModels.installed(a, lang)
+        if (!voiceBusy) {
+            voiceText.text = if (ok) tr("Voix installée (%s).", lang.uppercase()) +
+                (if (a.prefs.voiceEnabled) " " + tr("Le robot écoute.") else "")
+            else tr("Voix %s à télécharger (environ 45 Mo, une seule fois).", lang.uppercase())
+        }
+        voiceBtn.visibility = if (ok || voiceBusy) View.GONE else View.VISIBLE
+    }
+
+    private fun downloadVoice() {
+        if (voiceBusy) return
+        voiceBusy = true
+        val lang = a.prefs.voiceLang
+        renderVoice()
+        val app = a.applicationContext
+        Thread {
+            val err = try {
+                VoiceModels.download(app, lang) { pct -> view.post { voiceText.text = tr("Téléchargement de la voix : %d %%", pct) } }
+                null
+            } catch (e: Exception) {
+                e.message ?: e.toString()
+            }
+            view.post {
+                voiceBusy = false
+                if (err != null) voiceText.text = tr("Téléchargement impossible : %s", err) else {
+                    renderVoice()
+                    VoiceService.start(app)
+                }
+                voiceBtn.visibility = if (VoiceModels.installed(a, lang)) View.GONE else View.VISIBLE
             }
         }.start()
     }

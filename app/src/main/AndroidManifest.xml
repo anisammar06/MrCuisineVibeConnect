@@ -65,6 +65,16 @@
             android:exported="false" />
 
         <!-- Sonnerie des minuteurs de cuisine (par-dessus toutes les applis). -->
+        <!-- Commande vocale hors ligne (processus séparé) -->
+        <service
+            android:name=".voice.VoiceService"
+            android:exported="false"
+            android:process=":voix" />
+
+        <receiver
+            android:name=".voice.VoiceReceiver"
+            android:exported="false" />
+
         <!-- Télécommande flottante (Spotify, NewPipe…) -->
         <service
             android:name=".media.MediaRemote"

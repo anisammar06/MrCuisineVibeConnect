@@ -82,6 +82,7 @@ class MediaRemote : Service() {
     private var collapsed = false
     private var visible = false
     @Volatile private var alive = true
+    private var started = false
     private val main = Handler(Looper.getMainLooper())
     private var unsubSnapshot: (() -> Unit)? = null
     private var fault = false
@@ -89,7 +90,9 @@ class MediaRemote : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (root == null) {
+        instance = this
+        if (!started) {
+            started = true
             Thread {
                 ensureAccess(this)
                 main.post { build() }
@@ -343,6 +346,7 @@ class MediaRemote : Service() {
     }
 
     override fun onDestroy() {
+        if (instance === this) instance = null
         alive = false
         unsubSnapshot?.invoke()
         root?.let { try { wm.removeView(it) } catch (_: RuntimeException) {} }
@@ -350,8 +354,41 @@ class MediaRemote : Service() {
         super.onDestroy()
     }
 
+    enum class Action { PLAY, PAUSE, NEXT, PREV, VOLUME_UP, VOLUME_DOWN }
+
+    /** Commande venue d'ailleurs (voix) : appliquée au lecteur actif. */
+    private fun command(a: Action) {
+        act {
+            val n = now ?: read().also { now = it }
+            if (n == null) {
+                // Aucun lecteur : le volume agit quand même sur le son du robot.
+                val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                if (a == Action.VOLUME_UP || a == Action.VOLUME_DOWN) am.adjustStreamVolume(AudioManager.STREAM_MUSIC,
+                    if (a == Action.VOLUME_UP) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI)
+                return@act
+            }
+            when (a) {
+                Action.PLAY -> if (!n.playing) playPause()
+                Action.PAUSE -> if (n.playing) playPause()
+                Action.NEXT -> next()
+                Action.PREV -> prev()
+                Action.VOLUME_UP -> volume(2)
+                Action.VOLUME_DOWN -> volume(-2)
+            }
+        }
+    }
+
     companion object {
         private const val POSITION = "telecommande"
+        @Volatile private var instance: MediaRemote? = null
+
+        fun control(c: Context, a: Action) {
+            val r = instance
+            if (r != null) r.command(a) else {
+                start(c)
+                Handler(Looper.getMainLooper()).postDelayed({ instance?.command(a) }, 1500)
+            }
+        }
         /** Écran Spotify de Toque affiché : la télécommande Spotify est inutile. */
         @Volatile var spotifyScreenVisible = false
 
