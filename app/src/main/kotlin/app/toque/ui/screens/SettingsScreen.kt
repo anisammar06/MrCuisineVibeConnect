@@ -254,6 +254,12 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
             a.prefs.voiceWake = on
             VoiceService.restart(a.applicationContext)
         }, Ui.lp(t = 10))
+        vo.addView(Ui.text(c, tr("Sensibilité du micro"), 16f, Ui.TEXT2), Ui.lp(t = 12))
+        val gains = listOf(4 to tr("Normale"), 8 to tr("Forte"), 16 to tr("Très forte"), 24 to tr("Maximale"))
+        vo.addView(dropdown(gains.map { it.first.toString() to it.second }, a.prefs.voiceGain.toString()) { v ->
+            a.prefs.voiceGain = v.toInt()
+            VoiceService.restart(a.applicationContext)
+        }, Ui.lp(Ui.MATCH, Ui.u(58), t = 6))
         vo.addView(Ui.text(c, tr("Langue écoutée (une à la fois)"), 16f, Ui.TEXT2), Ui.lp(t = 12))
         voiceLangBox = Ui.horizontal(c)
         vo.addView(voiceLangBox, Ui.lp(t = 6))

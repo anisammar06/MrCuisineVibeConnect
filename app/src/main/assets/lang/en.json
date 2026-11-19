@@ -597,5 +597,10 @@
   "Voix %s à télécharger (environ 45 Mo, une seule fois).": "Voice %s to download (about 45 MB, once).",
   "Dernières phrases reconnues :": "Last recognised phrases:",
   "Rien reconnu pour l'instant.": "Nothing recognised yet.",
-  "Niveau du micro : %d %%": "Microphone level: %d %%"
+  "Niveau du micro : %d %%": "Microphone level: %d %%",
+  "Sensibilité du micro": "Microphone sensitivity",
+  "Maximale": "Maximum",
+  "Forte": "High",
+  "Normale": "Normal",
+  "Très forte": "Very high"
 }

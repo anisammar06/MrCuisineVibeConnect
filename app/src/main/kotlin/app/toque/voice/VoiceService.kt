@@ -89,6 +89,15 @@ class VoiceService : Service() {
                 continue
             }
             val recognizer = Recognizer(model, rate.toFloat(), grammar)
+            // Le micro du robot capte faiblement la voix (pics de 3 % à un mètre) : contrôle
+            // automatique du gain d'Android si disponible, puis amplification logicielle réglable.
+            val agc = try {
+                if (android.media.audiofx.AutomaticGainControl.isAvailable())
+                    android.media.audiofx.AutomaticGainControl.create(rec.audioSessionId)?.apply { enabled = true } else null
+            } catch (_: Exception) {
+                null
+            }
+            val gain = Prefs(this).voiceGain.coerceIn(1, 32)
             try {
                 rec.startRecording()
                 val buf = ShortArray(1600) // 0,1 s
@@ -97,7 +106,12 @@ class VoiceService : Service() {
                 while (running && System.currentTimeMillis() >= pauseUntil) {
                     val n = rec.read(buf, 0, buf.size)
                     if (n <= 0) continue
-                    for (k in 0 until n) { val v = Math.abs(buf[k].toInt()); if (v > peak) peak = v }
+                    for (k in 0 until n) {
+                        val amp = (buf[k] * gain).coerceIn(-32768, 32767)
+                        buf[k] = amp.toShort()
+                        val v = Math.abs(amp)
+                        if (v > peak) peak = v
+                    }
                     if (System.currentTimeMillis() - lastLevel > 5000) {
                         level = peak * 100 / 32767
                         peak = 0
@@ -135,6 +149,7 @@ class VoiceService : Service() {
                 Thread.sleep(2000)
             } finally {
                 try { rec.stop() } catch (_: Exception) {}
+                agc?.release()
                 rec.release()
                 recognizer.close()
             }

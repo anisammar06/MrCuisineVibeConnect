@@ -315,6 +315,13 @@ class Prefs(context: Context) {
             p.edit().putString("voiceLang", v).commit()
         }
 
+    /** Amplification du micro pour la commande vocale (le micro du robot est peu sensible). */
+    var voiceGain: Int
+        get() = p.getInt("voiceGain", 8)
+        set(v) {
+            p.edit().putInt("voiceGain", v).commit()
+        }
+
     /** Mot d'appel « robot » obligatoire avant une commande. */
     var voiceWake: Boolean
         get() = p.getBoolean("voiceWake", true)
