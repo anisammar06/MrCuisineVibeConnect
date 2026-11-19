@@ -30,7 +30,8 @@ sealed class VoiceCommand {
 }
 
 object Voice {
-    val WAKE = mapOf("fr" to listOf("robot"), "pl" to listOf("robot", "robocie", "robota"))
+    // « repos » n'est pas un nom de minuteur : le petit modèle français le confond avec « robot ».
+    val WAKE = mapOf("fr" to listOf("robot", "robots"), "pl" to listOf("robot", "robocie", "robota"))
 
     private val FR_UNITS = mapOf(
         "zéro" to 0, "un" to 1, "une" to 1, "deux" to 2, "trois" to 3, "quatre" to 4, "cinq" to 5, "six" to 6, "sept" to 7,
@@ -52,7 +53,7 @@ object Voice {
 
     /** Noms de minuteur reconnus → nom affiché. */
     private val FR_NAMES = mapOf("pâtes" to "Pâtes", "riz" to "Riz", "four" to "Four", "œufs" to "Œufs", "oeufs" to "Œufs",
-        "œuf" to "Œufs", "légumes" to "Légumes", "repos" to "Repos", "gâteau" to "Gâteau", "viande" to "Viande",
+        "œuf" to "Œufs", "légumes" to "Légumes", "gâteau" to "Gâteau", "viande" to "Viande",
         "pomme" to "Pommes de terre", "pommes" to "Pommes de terre", "thé" to "Thé")
     private val PL_NAMES = mapOf("makaron" to "Makaron", "ryż" to "Ryż", "piekarnik" to "Piekarnik", "jajka" to "Jajka",
         "jajko" to "Jajka", "warzywa" to "Warzywa", "ciasto" to "Ciasto", "mięso" to "Mięso", "ziemniaki" to "Ziemniaki",
@@ -68,7 +69,7 @@ object Voice {
         "minutnik", "timer", "stoper", "minuta", "minuty", "minut", "minutę", "sekunda", "sekundy", "sekund", "sekundę",
         "godzina", "godziny", "godzin", "godzinę", "i", "pół", "półtorej", "wyłącz", "zatrzymaj", "stop", "anuluj", "stój",
         "następny", "następna", "następne", "dalej", "poprzedni", "poprzednia", "poprzednie", "wstecz", "cofnij", "krok",
-        "pauza", "graj", "wznów", "odtwarzaj", "muzyka", "muzykę", "piosenka", "utwór", "głośniej", "ciszej", "na",
+        "pauza", "graj", "muzyka", "muzykę", "piosenka", "utwór", "głośniej", "ciszej", "na",
     )
 
     /** Mots que le moteur doit chercher (plus « [unk] » pour tout le reste). */
@@ -119,7 +120,7 @@ object Voice {
                 any(listOf("stop", "zatrzymaj", "stój", "wyłącz")) -> VoiceCommand.Stop
                 has("głośniej") -> VoiceCommand.VolumeUp
                 has("ciszej") -> VoiceCommand.VolumeDown
-                any(listOf("graj", "wznów", "odtwarzaj", "muzyka", "muzykę")) -> VoiceCommand.Play
+                any(listOf("graj", "muzyka", "muzykę")) -> VoiceCommand.Play
                 else -> null
             }
         } else {
