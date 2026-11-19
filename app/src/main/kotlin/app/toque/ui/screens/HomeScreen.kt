@@ -167,7 +167,9 @@ class HomeScreen(a: MainActivity) : Screen(a) {
     override fun onShow() {
         refreshClock()
         refresh()
-        val u1 = a.app.recipes.onChange { refresh() }
+        val u1a = a.app.recipesFr.onChange { refresh() }
+        val u1b = a.app.recipesPl.onChange { refresh() }
+        val u1 = { u1a(); u1b() }
         val u2 = SyncProgress.onChange { refresh() }
         val u3 = app.toque.kitchen.Shopping.onChange { refresh() }
         val u4 = app.toque.kitchen.Timers.onChange { refresh() }
