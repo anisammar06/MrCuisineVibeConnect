@@ -36,9 +36,9 @@ object Assistant {
         private set
 
     /** Phrase enregistrée par le processus d'écoute. */
-    fun ask(c: Context, wav: File, lang: String) {
+    fun ask(c: Context, wav: File, lang: String, offline: () -> Boolean = { false }) {
         val app = c.applicationContext
-        exec.execute { run(app, lang) { transcribe(app, wav, lang).also { wav.delete() } } }
+        exec.execute { run(app, lang, offline) { transcribe(app, wav, lang).also { wav.delete() } } }
     }
 
     /** Question tapée (test depuis les réglages). */
@@ -56,7 +56,7 @@ object Assistant {
         }
     }
 
-    private fun run(c: Context, lang: String, question: () -> String) {
+    private fun run(c: Context, lang: String, offline: () -> Boolean = { false }, question: () -> String) {
         busy = true
         var follow = false
         try {
@@ -76,6 +76,10 @@ object Assistant {
             Bubble.hideLater(15_000)
         } catch (e: Exception) {
             ToqueApp.of(c).log.write("assistant", "erreur : $e")
+            if (e is IOException && offline()) {
+                Bubble.hideLater(0)
+                return
+            }
             val msg = pick(lang, "Désolé, je n'arrive pas à joindre l'assistant.", "Przepraszam, nie mogę połączyć się z asystentem.")
             Bubble.show(c, "", msg + "\n" + (e.message ?: e.toString()).take(160))
             try { speakLocal(c, msg, lang) } catch (_: Exception) {}

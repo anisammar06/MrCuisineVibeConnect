@@ -146,7 +146,7 @@ class VoiceService : Service() {
                     if (assistant && now < followUntil) {
                         followUntil = 0
                         heard(text, "→ assistant (suite)")
-                        ask(ring, total, segStart, lang)
+                        ask(ring, total, segStart, lang, "")
                         continue
                     }
                     val after = Voice.afterWake(text, lang)
@@ -160,19 +160,23 @@ class VoiceService : Service() {
                         continue
                     }
                     val clean = words.filter { it != "[unk]" }
-                    // Mots hors commandes (« [unk] ») après le mot d'appel.
-                    val raw = text.split(' ')
-                    val wakeAt = raw.indexOfFirst { it in Voice.WAKE[lang].orEmpty() }
-                    val unknown = raw.drop(if (after != null) wakeAt + 1 else 0).count { it == "[unk]" }
                     val joined = if (after == null && now < awaitUntil) pending + clean else clean
                     val cmd = if (joined.isEmpty()) null else Voice.parseTokens(joined, lang)
-                    // Phrase libre (surtout des mots hors commandes) : c'est pour l'assistant.
-                    val free = unknown > 0 && unknown * 2 >= clean.size + unknown
-                    if (assistant && clean.size + unknown > 0 && (cmd == null || free)) {
+                    // Avec l'assistant, tout ce qui suit « robot » part vers lui : la grammaire fermée
+                    // force une phrase libre sur des mots de commande (« j'ai faim » → « lecture »).
+                    // Le texte local sert de secours si Internet ne répond pas.
+                    if (assistant) {
+                        val alone = after != null && raw(text).dropWhile { it !in Voice.WAKE[lang].orEmpty() }.drop(1).isEmpty()
+                        if (alone) {
+                            awaitUntil = now + 6000
+                            beep?.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
+                            heard(text, "j'écoute…")
+                            continue
+                        }
                         pending = emptyList()
                         awaitUntil = 0
                         heard(text, "→ assistant")
-                        ask(ring, total, segStart, lang)
+                        ask(ring, total, segStart, lang, cmd?.let { joined.joinToString(" ") }.orEmpty())
                         continue
                     }
                     if (joined.isEmpty()) {
@@ -222,7 +226,9 @@ class VoiceService : Service() {
      * Envoie la phrase (son brut des [from]..[to] derniers échantillons, volume remonté) à l'assistant
      * de l'appli, et coupe l'écoute le temps qu'il réponde (il la relance ensuite).
      */
-    private fun ask(ring: ShortArray, to: Long, from: Long, lang: String) {
+    private fun raw(text: String) = text.split(' ').filter { it.isNotEmpty() }
+
+    private fun ask(ring: ShortArray, to: Long, from: Long, lang: String, fallback: String) {
         val len = (to - from).coerceIn(0, ring.size.toLong() - RATE.toLong()).toInt()
         if (len < RATE / 3) return
         val pcm = ShortArray(len) { ring[((to - len + it) % ring.size).toInt()] }
@@ -238,7 +244,7 @@ class VoiceService : Service() {
             ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80).apply { startTone(ToneGenerator.TONE_PROP_ACK, 150) }
         } catch (_: RuntimeException) {
         }
-        VoiceReceiver.ask(this, f.path, lang)
+        VoiceReceiver.ask(this, f.path, lang, fallback)
     }
 
     private fun log(s: String) = ToqueApp.of(this).log.write("voix", s)

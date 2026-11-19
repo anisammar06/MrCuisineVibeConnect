@@ -10,6 +10,7 @@ import app.toque.ToqueApp
 import app.toque.assistant.Assistant
 import app.toque.core.i18n.tr
 import app.toque.core.kitchen.TimerBoard
+import app.toque.core.voice.Voice
 import app.toque.core.voice.VoiceCommand
 import app.toque.kitchen.Timers
 import app.toque.media.MediaRemote
@@ -28,7 +29,14 @@ class VoiceReceiver : BroadcastReceiver() {
             LISTENING -> feedback(c, tr("J'écoute…"))
             UNKNOWN -> feedback(c, tr("Pas compris : « %s »", heard))
             COMMAND -> execute(c, decode(i) ?: return, heard)
-            ASK -> Assistant.ask(c, File(i.getStringExtra(EXTRA_FILE) ?: return), i.getStringExtra(EXTRA_LANG) ?: "fr")
+            ASK -> {
+                val lang = i.getStringExtra(EXTRA_LANG) ?: "fr"
+                val fallback = i.getStringExtra(EXTRA_TEXT).orEmpty()
+                Assistant.ask(c, File(i.getStringExtra(EXTRA_FILE) ?: return), lang) {
+                    // Assistant injoignable : commande simple comprise hors ligne, s'il y en a une.
+                    Voice.parse(fallback, lang)?.let { cmd -> Handler(Looper.getMainLooper()).post { execute(c, cmd, fallback) } } != null
+                }
+            }
         }
     }
 
@@ -105,9 +113,9 @@ class VoiceReceiver : BroadcastReceiver() {
         private const val EXTRA_LANG = "lang"
 
         /** Phrase libre enregistrée, à transmettre à l'assistant (processus principal). */
-        fun ask(c: Context, file: String, lang: String) {
+        fun ask(c: Context, file: String, lang: String, fallback: String) {
             c.sendBroadcast(Intent(c, VoiceReceiver::class.java).setAction(ACTION).putExtra(EXTRA_KIND, ASK)
-                .putExtra(EXTRA_FILE, file).putExtra(EXTRA_LANG, lang))
+                .putExtra(EXTRA_FILE, file).putExtra(EXTRA_LANG, lang).putExtra(EXTRA_TEXT, fallback))
         }
 
         fun send(c: Context, kind: String, text: String) {
