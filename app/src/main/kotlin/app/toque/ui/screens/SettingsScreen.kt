@@ -30,6 +30,7 @@ import app.toque.media.Received
 import app.toque.media.ReceiverService
 import app.toque.media.SpotifyService
 import app.toque.media.MicTest
+import app.toque.assistant.Assistant
 import app.toque.voice.VoiceModels
 import app.toque.voice.VoiceService
 import app.toque.ui.Icon
@@ -50,9 +51,15 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
     private lateinit var voiceText: TextView
     private lateinit var voiceBtn: LinearLayout
     private var voiceBusy = false
+    private lateinit var iaText: TextView
+    private lateinit var iaQr: android.widget.ImageView
+    private lateinit var iaUrl: TextView
+    private lateinit var iaModelBox: LinearLayout
+    private lateinit var iaVoiceBox: LinearLayout
     private val voiceTick = object : Runnable {
         override fun run() {
             if (a.prefs.voiceEnabled && !voiceBusy) renderVoice()
+            renderAssistant(full = false)
             view.postDelayed(this, 3000)
         }
     }
@@ -281,6 +288,42 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         vo.addView(Ui.text(c, tr("Commandes : minuteur [nom] [durée] · arrête le minuteur · étape suivante / précédente · suivant · précédent · pause · stop · lecture · plus fort · moins fort.\nPolski : minutnik [nazwa] [czas] · wyłącz minutnik · następny krok · poprzedni krok · pauza · stop · graj · głośniej · ciszej."),
             14f, Ui.TEXT3).apply { setLineSpacing(0f, 1.12f) }, Ui.lp(t = 10))
         renderVoice()
+
+        // ---- Assistant (IA)
+        val ia = section(right, tr("Assistant (IA)"), Icon.Kind.INFO)
+        ia.addView(Ui.text(c, tr("Conversation libre avec le robot : « robot, j'ai faim, qu'est-ce que tu me proposes ce soir ? ». Il cherche dans les recettes et l'historique, lance des minuteurs, gère les courses et la musique, et répond à voix haute. En ligne : seule la phrase dite après « robot » est envoyée (transcription et voix OpenAI, réponses Claude d'Anthropic). Il ne démarre jamais le moteur."),
+            15f, Ui.TEXT2).apply { setLineSpacing(0f, 1.15f) })
+        ia.addView(toggle(tr("Assistant activé"), a.prefs.assistantEnabled) { on ->
+            a.prefs.assistantEnabled = on
+            VoiceService.restart(a.applicationContext)
+            renderAssistant()
+        }, Ui.lp(t = 10))
+        iaText = Ui.text(c, "", 15f, Ui.TEXT).apply { setLineSpacing(0f, 1.15f) }
+        ia.addView(iaText, Ui.lp(t = 10))
+        val iaQrRow = Ui.horizontal(c)
+        iaQr = android.widget.ImageView(c)
+        iaQrRow.addView(iaQr, Ui.lp(Ui.u(150), Ui.u(150)))
+        iaUrl = Ui.text(c, "", 15f, Ui.TEXT2).apply { setLineSpacing(0f, 1.15f) }
+        iaQrRow.addView(iaUrl, Ui.lp(0, Ui.WRAP, 1f, l = 14))
+        ia.addView(iaQrRow, Ui.lp(t = 8))
+        ia.addView(Ui.text(c, tr("Modèle"), 16f, Ui.TEXT2), Ui.lp(t = 12))
+        iaModelBox = Ui.horizontal(c)
+        ia.addView(iaModelBox, Ui.lp(t = 6))
+        ia.addView(Ui.text(c, tr("Voix"), 16f, Ui.TEXT2), Ui.lp(t = 12))
+        iaVoiceBox = Ui.horizontal(c)
+        ia.addView(iaVoiceBox, Ui.lp(t = 6))
+        val iaBtns = Ui.horizontal(c)
+        iaBtns.addView(Ui.button(c, tr("Tester la voix"), Ui.Style.SECONDARY, Icon.Kind.PLAY, height = 52) {
+            Assistant.say(a, if (a.prefs.voiceLang == "pl") "Cześć! Co dziś gotujemy?" else "Bonjour ! Qu'est-ce qu'on cuisine aujourd'hui ?")
+        }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
+        iaBtns.addView(Ui.button(c, tr("Effacer les clés"), Ui.Style.SECONDARY, null, height = 52) {
+            a.prefs.anthropicKey = ""
+            a.prefs.openaiKey = ""
+            VoiceService.restart(a.applicationContext)
+            renderAssistant()
+        }, Ui.lp(Ui.WRAP, Ui.WRAP))
+        ia.addView(iaBtns, Ui.lp(t = 12))
+        renderAssistant()
 
         // ---- Micro
         val mic = section(right, tr("Micro"), Icon.Kind.PLAY)
@@ -552,6 +595,42 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
                 if (r.ok) a.toast(r.message, Ui.OK)
             }
         }.start()
+    }
+
+    private fun renderAssistant(full: Boolean = true) {
+        val p = a.prefs
+        fun mark(ok: Boolean) = if (ok) tr("enregistrée") else tr("manquante")
+        iaText.text = tr("Clé Anthropic : %s · Clé OpenAI : %s", mark(p.anthropicKey.isNotBlank()), mark(p.openaiKey.isNotBlank())) + "\n" +
+            when {
+                !p.voiceEnabled -> tr("Activez aussi la commande vocale (mot d'appel « robot »).")
+                p.assistantReady -> tr("Prêt : dites « robot » puis votre question.")
+                p.assistantEnabled -> tr("Saisissez les clés depuis le téléphone (code QR).")
+                else -> ""
+            }
+        if (!full) return
+        val ip = Received.localIp()
+        if (ip.isEmpty() || !p.receiverEnabled) {
+            iaQr.setImageDrawable(null)
+            iaUrl.text = if (ip.isEmpty()) tr("Robot sans Wi-Fi") else tr("Activez « Réception depuis le téléphone » pour saisir les clés.")
+        } else {
+            val link = "http://$ip:${ReceiverService.PORT}/assistant?k=${p.receiverCode}"
+            iaQr.setImageBitmap(ShoppingScreen.qrBitmap(link, Ui.u(150)))
+            iaUrl.text = tr("Scannez avec le téléphone pour coller les clés API (elles ne s'affichent jamais en clair).") + "\nhttp://$ip:${ReceiverService.PORT}/assistant"
+        }
+        iaModelBox.removeAllViews()
+        for ((id, label) in listOf("claude-haiku-5-5" to tr("Rapide (Haiku)"), "claude-sonnet-5-5" to tr("Plus fin (Sonnet)"))) {
+            iaModelBox.addView(Ui.toggleChip(c, label, p.assistantModel == id) {
+                p.assistantModel = id
+                renderAssistant()
+            }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
+        }
+        iaVoiceBox.removeAllViews()
+        for (v in listOf("coral", "marin", "cedar", "nova")) {
+            iaVoiceBox.addView(Ui.toggleChip(c, v.replaceFirstChar { it.uppercase() }, p.assistantVoice == v) {
+                p.assistantVoice = v
+                renderAssistant()
+            }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 8))
+        }
     }
 
     private fun renderVoice() {

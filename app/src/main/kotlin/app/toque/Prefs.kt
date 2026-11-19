@@ -322,6 +322,42 @@ class Prefs(context: Context) {
             p.edit().putInt("voiceGain", v).commit()
         }
 
+    /** Assistant conversationnel (Claude + voix OpenAI), en ligne. */
+    var assistantEnabled: Boolean
+        get() = p.getBoolean("assistantEnabled", false)
+        set(v) {
+            p.edit().putBoolean("assistantEnabled", v).commit()
+        }
+
+    /** Clés API saisies depuis le téléphone (jamais affichées en clair). */
+    var anthropicKey: String
+        get() = p.getString("anthropicKey", "") ?: ""
+        set(v) {
+            p.edit().putString("anthropicKey", v).commit()
+        }
+
+    var openaiKey: String
+        get() = p.getString("openaiKey", "") ?: ""
+        set(v) {
+            p.edit().putString("openaiKey", v).commit()
+        }
+
+    /** Modèle Claude : rapide (Haiku) ou plus fin (Sonnet). */
+    var assistantModel: String
+        get() = p.getString("assistantModel", "claude-haiku-5-5") ?: "claude-haiku-5-5"
+        set(v) {
+            p.edit().putString("assistantModel", v).commit()
+        }
+
+    /** Voix de synthèse OpenAI. */
+    var assistantVoice: String
+        get() = p.getString("assistantVoice", "coral") ?: "coral"
+        set(v) {
+            p.edit().putString("assistantVoice", v).commit()
+        }
+
+    val assistantReady: Boolean get() = assistantEnabled && anthropicKey.isNotBlank() && openaiKey.isNotBlank()
+
     /** Mot d'appel « robot » obligatoire avant une commande. */
     var voiceWake: Boolean
         get() = p.getBoolean("voiceWake", true)

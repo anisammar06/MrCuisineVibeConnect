@@ -17,6 +17,7 @@ import app.toque.core.machine.Snapshot
 import app.toque.core.protocol.Mcc
 import app.toque.core.recipes.Recipe
 import app.toque.core.recipes.StepProgram
+import app.toque.kitchen.Cooked
 import app.toque.ui.HoldButton
 import app.toque.ui.Icon
 import app.toque.ui.MainActivity
@@ -111,6 +112,7 @@ class CookScreen(a: MainActivity, private val recipe: Recipe, startStep: Int) : 
     private fun next() {
         if (index >= recipe.steps.size - 1) {
             a.prefs.guidedRecipe = ""
+            Cooked.add(a, recipe.id, recipe.title)
             a.chime(1)
             a.toast(tr("Bon appétit !"), Ui.OK)
             a.back()
@@ -268,6 +270,7 @@ class CookScreen(a: MainActivity, private val recipe: Recipe, startStep: Int) : 
         val series = series(first)
         val job = series ?: m.toJob(tr("Étape %d · %s", first + 1, recipe.title), hotBlendConfirmed = hotBlendOk) ?: return
         val count = series?.phases?.size ?: 1
+        Cooked.add(a, recipe.id, recipe.title)
         a.prefs.guidedRecipe = recipe.id
         a.prefs.guidedStep = first
         a.startJob(job, onHotConfirmed = { hotBlendOk = true }) { v ->

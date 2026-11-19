@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import app.toque.core.json.Json
 import app.toque.core.kitchen.ShoppingList
 import app.toque.core.kitchen.TimerBoard
 import java.io.File
@@ -141,5 +142,45 @@ class TimerAlarm : BroadcastReceiver() {
     override fun onReceive(c: Context, intent: Intent) {
         Timers.restore(c)
         Timers.check(c)
+    }
+}
+
+/** Historique des recettes cuisinées (pour l'assistant : « qu'est-ce qu'on a fait récemment ? »). */
+object Cooked : Listeners() {
+    class Entry(val id: String, val title: String, val at: Long)
+
+    private var list: ArrayList<Entry>? = null
+    private lateinit var file: File
+
+    @Synchronized
+    fun all(c: Context): List<Entry> {
+        list?.let { return ArrayList(it) }
+        file = File(c.applicationContext.filesDir, "cuisine.json")
+        val l = ArrayList<Entry>()
+        try {
+            if (file.exists()) for (e in Json.parse(file.readText()) as? List<*> ?: emptyList<Any?>()) {
+                val m = e as? Map<*, *> ?: continue
+                l += Entry(m["id"]?.toString() ?: continue, m["title"]?.toString().orEmpty(), (m["at"] as? Number)?.toLong() ?: 0L)
+            }
+        } catch (_: Exception) {
+        }
+        list = l
+        return ArrayList(l)
+    }
+
+    /** Note une recette cuisinée (une seule fois par jour et par recette). */
+    fun add(c: Context, id: String, title: String) {
+        synchronized(this) {
+            all(c)
+            val l = list ?: return
+            val now = System.currentTimeMillis()
+            if (l.any { it.id == id && now - it.at < 12 * 3600_000L }) return
+            l += Entry(id, title, now)
+            while (l.size > 300) l.removeAt(0)
+            val tmp = File(file.path + ".tmp")
+            tmp.writeText(Json.write(l.map { linkedMapOf("id" to it.id, "title" to it.title, "at" to it.at) }))
+            tmp.renameTo(file)
+        }
+        changed()
     }
 }

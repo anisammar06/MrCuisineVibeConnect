@@ -11,6 +11,9 @@ import android.os.Looper
 import app.toque.Prefs
 import app.toque.ToqueApp
 import app.toque.core.json.Json
+import app.toque.core.json.obj
+import app.toque.core.json.str
+import app.toque.voice.VoiceService
 import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -194,6 +197,10 @@ class ReceiverService : Service() {
             courses(r, out)
             return
         }
+        if (r.path == "/assistant" || r.path.startsWith("/assistant/")) {
+            assistantKeys(r, out)
+            return
+        }
         if (r.headers["x-code"] != prefs.receiverCode) {
             reply(out, 401, linkedMapOf("ok" to false, "message" to "Code d'appairage incorrect"))
             return
@@ -277,6 +284,44 @@ class ReceiverService : Service() {
         }
     }
 
+    // ------------------------------------------------------------------ clés de l'assistant (téléphone)
+
+    /** Page où l'on colle les clés API depuis le téléphone ; elles ne sont jamais renvoyées. */
+    private fun assistantKeys(r: Request, out: OutputStream) {
+        if (r.query["k"] != prefs.receiverCode) {
+            raw(out, 401, "text/html", "<meta name=viewport content='width=device-width'><p style='font:18px sans-serif'>Code incorrect : scannez à nouveau le code QR affiché sur le robot.</p>")
+            return
+        }
+        when (r.path) {
+            "/assistant" -> raw(out, 200, "text/html", ASSISTANT_PAGE)
+            "/assistant/status" -> raw(out, 200, "application/json", assistantStatus())
+            "/assistant/keys" -> {
+                val len = (r.headers["content-length"]?.toIntOrNull() ?: 0).coerceIn(0, 8192)
+                val m = try {
+                    Json.parse(String(readFully(r.body, len), Charsets.UTF_8)).obj()
+                } catch (_: Exception) {
+                    emptyMap()
+                }
+                val ant = m.str("anthropic").orEmpty().trim()
+                val oai = m.str("openai").orEmpty().trim()
+                if (ant.startsWith("sk-ant-")) prefs.anthropicKey = ant
+                if (oai.startsWith("sk-")) prefs.openaiKey = oai
+                if (ant.isNotEmpty() || oai.isNotEmpty()) {
+                    prefs.assistantEnabled = true
+                    ToqueApp.of(this).log.write("assistant", "clés mises à jour depuis le téléphone")
+                    main.post { VoiceService.restart(this) }
+                }
+                raw(out, 200, "application/json", assistantStatus())
+            }
+            else -> raw(out, 404, "text/plain", "Inconnu")
+        }
+    }
+
+    private fun assistantStatus(): String = Json.write(linkedMapOf(
+        "anthropic" to prefs.anthropicKey.isNotBlank(), "openai" to prefs.openaiKey.isNotBlank(),
+        "voice" to prefs.voiceEnabled, "enabled" to prefs.assistantEnabled,
+    ))
+
     private fun itemsJson(): String = Json.write(app.toque.kitchen.Shopping.get(this).items.map {
         linkedMapOf("id" to it.id, "text" to it.display, "recipes" to it.recipes.joinToString(" · "), "done" to it.done)
     })
@@ -316,6 +361,41 @@ class ReceiverService : Service() {
         const val PORT = 8770
         const val NAME = "Gotuj z Kasią"
         const val SERVICE_TYPE = "_gotuj._tcp."
+
+        private val ASSISTANT_PAGE = """<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Assistant du robot</title>
+<style>
+body{font:17px system-ui,sans-serif;margin:0;padding:18px;background:#181410;color:#f3ece4}
+h1{font-size:22px;margin:0 0 6px}p{color:#bfb3a5;line-height:1.4}
+label{display:block;margin:18px 0 6px;font-weight:600}
+input{width:100%;box-sizing:border-box;font:16px monospace;padding:12px;border-radius:10px;border:1px solid #5a4a3a;background:#241d17;color:#fff}
+button{margin-top:20px;width:100%;padding:14px;font:600 18px system-ui;border:0;border-radius:12px;background:#f0a040;color:#1a0e05}
+.st{margin-top:16px;padding:12px;border-radius:10px;background:#241d17}
+a{color:#f0a040}
+</style></head><body>
+<h1>Assistant du robot</h1>
+<p>Collez vos clés API. Elles sont enregistrées sur le robot et ne s'affichent plus jamais. Laissez un champ vide pour garder la clé actuelle.</p>
+<label>Clé Anthropic (Claude) — commence par sk-ant-</label>
+<input id="a" type="password" autocomplete="off" placeholder="sk-ant-…">
+<p style="font-size:14px">À créer sur <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a></p>
+<label>Clé OpenAI (voix) — commence par sk-</label>
+<input id="o" type="password" autocomplete="off" placeholder="sk-…">
+<p style="font-size:14px">À créer sur <a href="https://platform.openai.com/api-keys">platform.openai.com</a></p>
+<button id="b">Enregistrer sur le robot</button>
+<div class="st" id="s">…</div>
+<script>
+var k=new URLSearchParams(location.search).get('k');
+function show(j){document.getElementById('s').innerHTML='Clé Anthropic : '+(j.anthropic?'✅ enregistrée':'❌ manquante')+'<br>Clé OpenAI : '+(j.openai?'✅ enregistrée':'❌ manquante')+(j.voice?'':'<br>⚠️ Activez la commande vocale dans les réglages du robot.');}
+fetch('/assistant/status?k='+k).then(function(r){return r.json()}).then(show);
+document.getElementById('b').onclick=function(){
+ var a=document.getElementById('a').value.trim(),o=document.getElementById('o').value.trim();
+ if(a&&a.indexOf('sk-ant-')!==0){alert('La clé Anthropic doit commencer par sk-ant-');return}
+ if(o&&o.indexOf('sk-')!==0){alert('La clé OpenAI doit commencer par sk-');return}
+ fetch('/assistant/keys?k='+k,{method:'POST',body:JSON.stringify({anthropic:a,openai:o})}).then(function(r){return r.json()}).then(function(j){
+  document.getElementById('a').value='';document.getElementById('o').value='';show(j);});
+};
+</script></body></html>"""
 
         private val COURSES_PAGE = """<!doctype html>
 <html lang="fr"><head><meta charset="utf-8">

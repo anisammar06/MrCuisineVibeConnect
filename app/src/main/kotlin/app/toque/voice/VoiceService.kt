@@ -16,6 +16,7 @@ import app.toque.core.json.obj
 import app.toque.core.json.str
 import app.toque.core.voice.Voice
 import app.toque.core.voice.VoiceCommand
+import app.toque.core.voice.Wav
 import org.vosk.LibVosk
 import org.vosk.LogLevel
 import org.vosk.Model
@@ -35,6 +36,8 @@ import javax.net.ssl.HttpsURLConnection
 class VoiceService : Service() {
     @Volatile private var running = false
     @Volatile private var pauseUntil = 0L
+    /** Fenêtre de suite de conversation (sans mot d'appel) après une réponse de l'assistant. */
+    @Volatile private var followUntil = 0L
     private var thread: Thread? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -46,6 +49,11 @@ class VoiceService : Service() {
             return START_NOT_STICKY
         }
         intent?.getLongExtra(EXTRA_PAUSE_MS, 0L)?.takeIf { it > 0 }?.let { pauseUntil = System.currentTimeMillis() + it }
+        if (intent?.getBooleanExtra(EXTRA_RESUME, false) == true) {
+            pauseUntil = 0
+            // Le micro met ~1 s à repartir : la fenêtre compte depuis la reprise.
+            followUntil = if (intent.getBooleanExtra(EXTRA_FOLLOW, false)) System.currentTimeMillis() + 9000 else 0
+        }
         if (!running) {
             running = true
             thread = Thread({ loop(p.voiceLang) }, "toque-voix").also { it.start() }
@@ -69,18 +77,23 @@ class VoiceService : Service() {
         } catch (_: RuntimeException) {
             null
         }
-        val requireWake = Prefs(this).voiceWake
+        val prefs = Prefs(this)
+        val requireWake = prefs.voiceWake
+        // Assistant en ligne : une phrase libre après « robot » part vers Claude.
+        val assistant = prefs.assistantReady
         var awaitUntil = 0L
         var pending: List<String> = emptyList()
+        // Mémoire des 20 dernières secondes de son brut, pour envoyer la phrase entière à l'assistant.
+        val ring = ShortArray(RATE * 20)
+        var total = 0L
         while (running) {
             if (System.currentTimeMillis() < pauseUntil) {
                 Thread.sleep(300)
                 continue
             }
-            val rate = 16_000
-            val min = AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+            val min = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
             val rec = try {
-                AudioRecord(MediaRecorder.AudioSource.MIC, rate, AudioFormat.CHANNEL_IN_MONO,
+                AudioRecord(MediaRecorder.AudioSource.MIC, RATE, AudioFormat.CHANNEL_IN_MONO,
                     AudioFormat.ENCODING_PCM_16BIT, maxOf(min, 8192))
             } catch (e: Exception) {
                 null
@@ -90,7 +103,7 @@ class VoiceService : Service() {
                 Thread.sleep(3000)
                 continue
             }
-            val recognizer = Recognizer(model, rate.toFloat(), grammar)
+            val recognizer = Recognizer(model, RATE.toFloat(), grammar)
             // Le micro du robot capte faiblement la voix (pics de 3 % à un mètre) : contrôle
             // automatique du gain d'Android si disponible, puis amplification logicielle réglable.
             val agc = try {
@@ -99,21 +112,24 @@ class VoiceService : Service() {
             } catch (_: Exception) {
                 null
             }
-            val gain = Prefs(this).voiceGain.coerceIn(1, 32)
+            val gain = prefs.voiceGain.coerceIn(1, 32)
             try {
                 rec.startRecording()
                 val buf = ShortArray(1600) // 0,1 s
                 var peak = 0
                 var lastLevel = System.currentTimeMillis()
+                var uttStart = total
                 while (running && System.currentTimeMillis() >= pauseUntil) {
                     val n = rec.read(buf, 0, buf.size)
                     if (n <= 0) continue
                     for (k in 0 until n) {
+                        ring[((total + k) % ring.size).toInt()] = buf[k]
                         val amp = (buf[k] * gain).coerceIn(-32768, 32767)
                         buf[k] = amp.toShort()
                         val v = Math.abs(amp)
                         if (v > peak) peak = v
                     }
+                    total += n
                     if (System.currentTimeMillis() - lastLevel > 5000) {
                         level = peak * 100 / 32767
                         peak = 0
@@ -121,9 +137,18 @@ class VoiceService : Service() {
                         writeStatus()
                     }
                     if (!recognizer.acceptWaveForm(buf, n)) continue
+                    val segStart = uttStart
+                    uttStart = total
                     val text = Json.parse(recognizer.result).obj().str("text").orEmpty().trim()
                     if (text.isEmpty()) continue
                     val now = System.currentTimeMillis()
+                    // Suite de conversation : juste après une réponse, pas besoin de redire « robot ».
+                    if (assistant && now < followUntil) {
+                        followUntil = 0
+                        heard(text, "→ assistant (suite)")
+                        ask(ring, total, segStart, lang)
+                        continue
+                    }
                     val after = Voice.afterWake(text, lang)
                     val words: List<String>? = when {
                         after != null -> after
@@ -134,9 +159,22 @@ class VoiceService : Service() {
                         heard(text, "ignoré (pas de « robot »)")
                         continue
                     }
-                    // Une commande dite en deux morceaux (« robot, minuteur » … « cinq minutes ») est recollée.
                     val clean = words.filter { it != "[unk]" }
+                    // Mots hors commandes (« [unk] ») après le mot d'appel.
+                    val raw = text.split(' ')
+                    val wakeAt = raw.indexOfFirst { it in Voice.WAKE[lang].orEmpty() }
+                    val unknown = raw.drop(if (after != null) wakeAt + 1 else 0).count { it == "[unk]" }
                     val joined = if (after == null && now < awaitUntil) pending + clean else clean
+                    val cmd = if (joined.isEmpty()) null else Voice.parseTokens(joined, lang)
+                    // Phrase libre (surtout des mots hors commandes) : c'est pour l'assistant.
+                    val free = unknown > 0 && unknown * 2 >= clean.size + unknown
+                    if (assistant && clean.size + unknown > 0 && (cmd == null || free)) {
+                        pending = emptyList()
+                        awaitUntil = 0
+                        heard(text, "→ assistant")
+                        ask(ring, total, segStart, lang)
+                        continue
+                    }
                     if (joined.isEmpty()) {
                         pending = emptyList()
                         awaitUntil = now + 6000
@@ -145,7 +183,6 @@ class VoiceService : Service() {
                         heard(text, "j'écoute…")
                         continue
                     }
-                    val cmd = Voice.parseTokens(joined, lang)
                     if (cmd == null) {
                         if (pending.isEmpty() || after != null) {
                             // Début de commande incomplet : on attend la suite 6 secondes.
@@ -179,6 +216,29 @@ class VoiceService : Service() {
         }
         model.close()
         beep?.release()
+    }
+
+    /**
+     * Envoie la phrase (son brut des [from]..[to] derniers échantillons, volume remonté) à l'assistant
+     * de l'appli, et coupe l'écoute le temps qu'il réponde (il la relance ensuite).
+     */
+    private fun ask(ring: ShortArray, to: Long, from: Long, lang: String) {
+        val len = (to - from).coerceIn(0, ring.size.toLong() - RATE.toLong()).toInt()
+        if (len < RATE / 3) return
+        val pcm = ShortArray(len) { ring[((to - len + it) % ring.size).toInt()] }
+        val f = File(filesDir, "voix/question.wav")
+        try {
+            f.writeBytes(Wav.encode(Wav.normalize(pcm), RATE))
+        } catch (e: Exception) {
+            log("question : $e")
+            return
+        }
+        pauseUntil = System.currentTimeMillis() + 90_000
+        try {
+            ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80).apply { startTone(ToneGenerator.TONE_PROP_ACK, 150) }
+        } catch (_: RuntimeException) {
+        }
+        VoiceReceiver.ask(this, f.path, lang)
     }
 
     private fun log(s: String) = ToqueApp.of(this).log.write("voix", s)
@@ -226,6 +286,15 @@ class VoiceService : Service() {
 
     companion object {
         const val EXTRA_PAUSE_MS = "pause_ms"
+        const val EXTRA_RESUME = "resume"
+        const val EXTRA_FOLLOW = "follow"
+        const val RATE = 16_000
+
+        /** Relance l'écoute après une réponse de l'assistant ([follow] : la suite sans « robot »). */
+        fun resume(c: Context, follow: Boolean) {
+            val p = Prefs(c)
+            if (p.voiceEnabled) c.startService(Intent(c, VoiceService::class.java).putExtra(EXTRA_RESUME, true).putExtra(EXTRA_FOLLOW, follow))
+        }
 
         fun start(c: Context) {
             val p = Prefs(c)
