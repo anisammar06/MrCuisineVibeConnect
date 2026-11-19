@@ -7,6 +7,9 @@ import app.toque.voice.VoiceService
 import app.toque.recipes.CookidooClient
 import app.toque.recipes.CookidooSync
 import app.toque.kitchen.Timers
+import app.toque.ScreenPower
+import app.toque.assistant.Assistant
+import app.toque.ui.screens.CookScreen
 import app.toque.media.ReceiverService
 import android.app.Activity
 import android.content.Intent
@@ -71,7 +74,7 @@ class MainActivity : Activity() {
         app = ToqueApp.of(this)
         val dm = resources.displayMetrics
         Ui.init(dm.widthPixels, dm.heightPixels)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        ScreenPower.applyTimeout(this)
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Ui.BG))
 
         root = FrameLayout(this)
@@ -154,7 +157,28 @@ class MainActivity : Activity() {
     var resumed = false
         private set
 
+    /**
+     * L'écran reste allumé seulement quand c'est utile ; sinon Android le met en veille après le délai
+     * choisi dans les réglages.
+     */
+    private var keepOn = false
+    private val keepOnTick = object : Runnable {
+        override fun run() {
+            val now = System.currentTimeMillis()
+            val want = prefs.screenSleepMin <= 0 || snapshot.busy || current is CookScreen || Assistant.busy ||
+                Timers.get(this@MainActivity).timers.any { !it.dismissed && it.leftMs(now) > 0 && !it.paused } ||
+                Timers.get(this@MainActivity).ringing(now).isNotEmpty()
+            if (want != keepOn) {
+                keepOn = want
+                if (want) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+            root.postDelayed(this, 3000)
+        }
+    }
+
     override fun onPause() {
+        root.removeCallbacks(keepOnTick)
         resumed = false
         super.onPause()
     }
@@ -162,6 +186,8 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         resumed = true
+        root.removeCallbacks(keepOnTick)
+        root.post(keepOnTick)
         instance = this
         immersive()
         prefs.returnBubble = false

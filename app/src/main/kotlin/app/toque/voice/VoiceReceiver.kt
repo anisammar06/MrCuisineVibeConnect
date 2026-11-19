@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import app.toque.ToqueApp
+import app.toque.ScreenPower
 import app.toque.assistant.Assistant
 import app.toque.core.i18n.tr
 import app.toque.core.kitchen.TimerBoard
@@ -41,6 +42,7 @@ class VoiceReceiver : BroadcastReceiver() {
     }
 
     private fun execute(c: Context, cmd: VoiceCommand, heard: String) {
+        ScreenPower.wake(c, 10_000)
         val app = ToqueApp.of(c)
         val snap = app.machine.snapshot
         val cooking = snap?.busy == true

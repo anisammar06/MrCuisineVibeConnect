@@ -1,5 +1,6 @@
 package app.toque.kitchen
 
+import app.toque.ScreenPower
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -49,6 +50,7 @@ class TimerRing : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        ScreenPower.wake(this, 60_000)
         if (root == null) {
             if (!ReturnBubble.canShow(this)) {
                 Thread {

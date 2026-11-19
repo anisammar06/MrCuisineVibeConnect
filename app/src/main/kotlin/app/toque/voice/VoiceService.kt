@@ -10,6 +10,7 @@ import android.media.MediaRecorder
 import android.media.ToneGenerator
 import android.os.IBinder
 import app.toque.Prefs
+import app.toque.ScreenPower
 import app.toque.ToqueApp
 import app.toque.core.json.Json
 import app.toque.core.json.obj
@@ -174,6 +175,7 @@ class VoiceService : Service() {
                             // on garde le son depuis le début de ce morceau pour ne pas en perdre le début.
                             awaitFrom = segStart
                             awaitUntil = now + 6000
+                            ScreenPower.wake(this, 10_000)
                             beep?.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
                             heard(text, "j'écoute…")
                             continue

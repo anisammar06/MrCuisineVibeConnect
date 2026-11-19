@@ -636,5 +636,12 @@
   "Téléchargez d'abord la voix hors ligne.": "Download the offline voice first.",
   "Un seul mot, au moins 2 lettres.": "One word, at least 2 letters.",
   "Prénom de l'assistant (mot d'appel)": "Assistant's name (wake word)",
-  "Vitesse de lecture": "Reading speed"
+  "Vitesse de lecture": "Reading speed",
+  "Écran": "Screen",
+  "10 min": "10 min",
+  "30 min": "30 min",
+  "Jamais": "Never",
+  "5 min": "5 min",
+  "2 min": "2 min",
+  "Mise en veille automatique de l'écran sans action. Il reste allumé pendant une cuisson, la cuisson guidée, un minuteur ou quand l'assistant parle ; un minuteur qui sonne ou l'assistant le rallument.": "Automatic screen sleep when idle. It stays on during cooking, guided cooking, a timer or while the assistant speaks; a ringing timer or the assistant turns it back on."
 }

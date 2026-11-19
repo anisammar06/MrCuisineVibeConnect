@@ -31,6 +31,7 @@ import app.toque.media.ReceiverService
 import app.toque.media.SpotifyService
 import app.toque.media.MicTest
 import app.toque.assistant.Assistant
+import app.toque.ScreenPower
 import app.toque.voice.VoiceModels
 import app.toque.voice.VoiceService
 import app.toque.ui.Icon
@@ -140,6 +141,23 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         }, Ui.lp(Ui.MATCH, Ui.u(58), t = 4))
 
         // ---- Date et heure
+        val screenSec = section(right, tr("Écran"), Icon.Kind.CLOCK)
+        screenSec.addView(Ui.text(c, tr("Mise en veille automatique de l'écran sans action. Il reste allumé pendant une cuisson, la cuisson guidée, un minuteur ou quand l'assistant parle ; un minuteur qui sonne ou l'assistant le rallument."),
+            15f, Ui.TEXT2).apply { setLineSpacing(0f, 1.15f) })
+        val sleepBox = Ui.horizontal(c)
+        fun renderSleep() {
+            sleepBox.removeAllViews()
+            for ((m, label) in listOf(2 to tr("2 min"), 5 to tr("5 min"), 10 to tr("10 min"), 30 to tr("30 min"), 0 to tr("Jamais"))) {
+                sleepBox.addView(Ui.toggleChip(c, label, a.prefs.screenSleepMin == m) {
+                    a.prefs.screenSleepMin = m
+                    ScreenPower.applyTimeout(a)
+                    renderSleep()
+                }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 8))
+            }
+        }
+        renderSleep()
+        screenSec.addView(sleepBox, Ui.lp(t = 10))
+
         val time = section(right, tr("Date et heure"), Icon.Kind.CLOCK)
         val zones = listOf(ZoneLookup.AUTO to tr("Automatique (d'après la connexion Internet)")) +
             (ZoneLookup.COMMON + listOf(TimeSync.current(), a.prefs.timeZone))

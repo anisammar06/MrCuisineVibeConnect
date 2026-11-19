@@ -356,6 +356,13 @@ class Prefs(context: Context) {
             p.edit().putString("assistantVoice", v).commit()
         }
 
+    /** Mise en veille de l'écran après ce nombre de minutes sans toucher (0 = jamais). */
+    var screenSleepMin: Int
+        get() = p.getInt("screenSleepMin", 5)
+        set(v) {
+            p.edit().putInt("screenSleepMin", v).commit()
+        }
+
     /** Prénom de l'assistant, qui sert aussi de mot d'appel (« robot » par défaut). */
     var assistantName: String
         get() = p.getString("assistantName", "robot")?.ifBlank { "robot" } ?: "robot"

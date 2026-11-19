@@ -6,6 +6,7 @@ import android.media.MediaPlayer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import app.toque.Prefs
+import app.toque.ScreenPower
 import app.toque.ToqueApp
 import app.toque.core.json.Json
 import app.toque.core.json.list
@@ -58,6 +59,7 @@ object Assistant {
 
     private fun run(c: Context, lang: String, offline: () -> Boolean = { false }, question: () -> String) {
         busy = true
+        ScreenPower.wake(c, 20_000)
         var follow = false
         try {
             Bubble.show(c, "", pick(lang, "J'écoute…", "Słucham…"))
