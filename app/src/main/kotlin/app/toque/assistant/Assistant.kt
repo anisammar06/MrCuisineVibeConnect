@@ -125,9 +125,9 @@ object Assistant {
         repeat(6) {
             val body = linkedMapOf<String, Any?>(
                 "model" to prefs.assistantModel,
-                "max_tokens" to 800,
+                "max_tokens" to 1500,
                 "system" to system(c, lang),
-                "tools" to Tools.DEFINITIONS,
+                "tools" to Tools.DEFINITIONS + webSearch(prefs),
                 "messages" to messages,
             )
             val r = Net.post(c, "https://api.anthropic.com/v1/messages",
@@ -140,7 +140,10 @@ object Assistant {
             val res = Json.parse(r.text).obj()
             val content = res["content"].list()
             messages += mapOf("role" to "assistant", "content" to content)
-            if (res.str("stop_reason") != "tool_use") {
+            val stop = res.str("stop_reason")
+            // Recherche web longue côté serveur : on renvoie tel quel pour qu'il continue.
+            if (stop == "pause_turn") return@repeat
+            if (stop != "tool_use") {
                 lastAt = System.currentTimeMillis()
                 return content.map { it.obj() }.filter { it.str("type") == "text" }.joinToString(" ") { it.str("text").orEmpty() }.trim()
             }
@@ -156,6 +159,13 @@ object Assistant {
             messages += mapOf("role" to "user", "content" to results)
         }
         return pick(lang, "Je n'ai pas réussi à terminer, peux-tu reformuler ?", "Nie udało mi się, możesz powtórzyć inaczej?")
+    }
+
+    /** Recherche web exécutée par Anthropic (météo, actualité, tout sujet récent). */
+    private fun webSearch(p: Prefs): Map<String, Any?> {
+        val loc = linkedMapOf<String, Any?>("type" to "approximate", "timezone" to java.util.TimeZone.getDefault().id)
+        if (p.assistantCity.isNotBlank()) loc["city"] = p.assistantCity
+        return linkedMapOf("type" to "web_search_20250305", "name" to "web_search", "max_uses" to 3, "user_location" to loc)
     }
 
     /** Garde la conversation courte : on coupe au début d'une vraie question (pas un résultat d'outil). */
@@ -181,14 +191,15 @@ object Assistant {
             else -> "à l'arrêt"
         }
         val spoken = if (lang == "pl") "polonais" else "français"
-        return """Tu es l'assistant vocal du robot de cuisine Monsieur Cuisine Connect de la famille (appli « Gotuj z Kasią »).
-Tu parles avec la famille dans la cuisine. Ta réponse est LUE À VOIX HAUTE : phrases courtes et naturelles, pas de liste à puces, pas de markdown, pas d'emoji, pas d'identifiants de recette. 1 à 3 phrases en général ; pour proposer des plats, 2 ou 3 idées maximum, chacune en quelques mots (nom, durée).
+        val city = Prefs(c).assistantCity.ifBlank { "inconnue (demande-la si besoin, ou utilise le fuseau horaire)" }
+        return """Tu es l'assistant vocal de la famille, intégré à leur robot de cuisine Monsieur Cuisine Connect (appli « Gotuj z Kasią »). Tu es un assistant généraliste : on peut te parler de n'importe quel sujet (cuisine, météo, actualité, culture, devoirs, conseils, calculs, traductions, discussion…) et tu réponds avec plaisir, comme Claude.
+Ta réponse est LUE À VOIX HAUTE : phrases naturelles, pas de liste à puces, pas de markdown, pas d'emoji, pas d'URL ni d'identifiants. Sois bref par défaut (1 à 4 phrases) ; développe davantage seulement si on te le demande ou si le sujet l'exige, sans dépasser une minute de lecture. Pour proposer des plats, 2 ou 3 idées maximum, chacune en quelques mots.
 Réponds dans la langue de la personne (on t'a parlé en $spoken ; si elle parle polonais, réponds en polonais).
 La phrase vient d'une transcription automatique : elle peut contenir des fautes ou commencer par « robot » ; devine le sens.
-Utilise les outils pour chercher dans les recettes du robot (Lidl et Thermomix, en français et en polonais) et dans l'historique de ce qui a été cuisiné, pour proposer des choses variées (évite ce qui a été fait ces derniers jours, sauf demande). Ne propose que des recettes trouvées avec les outils, sauf si on te demande une idée générale.
-Quand la personne choisit une recette, ouvre-la à l'écran avec open_recipe. Tu peux lancer des minuteurs, gérer la liste de courses et la musique.
-SÉCURITÉ : tu ne peux jamais démarrer le moteur, chauffer ou lancer une étape ; c'est la personne qui appuie sur Démarrer à l'écran. Tu peux seulement mettre en pause ou arrêter. Si on te demande de lancer la cuisson, ouvre la recette et dis d'appuyer sur Démarrer.
-Si tu ne sais pas, dis-le simplement. Si tu poses une question, la personne peut répondre directement sans redire « robot ».
+Pour la météo, l'actualité, les horaires, les prix, les résultats sportifs ou tout ce qui peut avoir changé, utilise la recherche web (web_search) plutôt que ta mémoire. Ville de la famille : $city.
+Pour la cuisine, utilise les outils des recettes du robot (Lidl et Thermomix, français et polonais) et l'historique de ce qui a été cuisiné, pour proposer des choses variées (évite ce qui a été fait ces derniers jours, sauf demande). Quand la personne choisit une recette, ouvre-la à l'écran avec open_recipe. Tu peux aussi lancer des minuteurs, gérer la liste de courses et la musique.
+SÉCURITÉ : tu ne peux jamais démarrer le moteur, chauffer ou lancer une étape ; c'est la personne qui appuie sur Démarrer à l'écran. Tu peux seulement mettre en pause ou arrêter.
+Si tu poses une question, la personne peut répondre directement sans redire « robot ».
 Contexte : nous sommes le $day. Écran affiché : ${screen.ifEmpty { "accueil" }}. Robot : $machine. Minuteurs en cours : ${timers.ifEmpty { "aucun" }}."""
     }
 

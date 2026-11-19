@@ -356,6 +356,13 @@ class Prefs(context: Context) {
             p.edit().putString("assistantVoice", v).commit()
         }
 
+    /** Ville pour la météo et les recherches locales de l'assistant. */
+    var assistantCity: String
+        get() = p.getString("assistantCity", "") ?: ""
+        set(v) {
+            p.edit().putString("assistantCity", v).commit()
+        }
+
     val assistantReady: Boolean get() = assistantEnabled && anthropicKey.isNotBlank() && openaiKey.isNotBlank()
 
     /** Mot d'appel « robot » obligatoire avant une commande. */

@@ -44,7 +44,7 @@ internal object Bubble {
         v.elevation = Ui.uf(12f)
         v.setPadding(Ui.u(22), Ui.u(14), Ui.u(22), Ui.u(16))
         val q = Ui.text(c, "", 16f, Ui.TEXT2)
-        val r = Ui.text(c, "", 19f, Ui.TEXT).apply { setLineSpacing(0f, 1.12f); maxLines = 7 }
+        val r = Ui.text(c, "", 19f, Ui.TEXT).apply { setLineSpacing(0f, 1.12f); maxLines = 12 }
         v.addView(q)
         v.addView(r, Ui.lp(t = 4))
         v.setOnClickListener { remove() }

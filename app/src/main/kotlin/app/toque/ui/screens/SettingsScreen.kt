@@ -291,7 +291,7 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
 
         // ---- Assistant (IA)
         val ia = section(right, tr("Assistant (IA)"), Icon.Kind.INFO)
-        ia.addView(Ui.text(c, tr("Conversation libre avec le robot : « robot, j'ai faim, qu'est-ce que tu me proposes ce soir ? ». Il cherche dans les recettes et l'historique, lance des minuteurs, gère les courses et la musique, et répond à voix haute. En ligne : seule la phrase dite après « robot » est envoyée (transcription et voix OpenAI, réponses Claude d'Anthropic). Il ne démarre jamais le moteur."),
+        ia.addView(Ui.text(c, tr("Conversation libre avec le robot, sur n'importe quel sujet : « robot, j'ai faim, qu'est-ce que tu me proposes ce soir ? », « robot, quel temps fera-t-il demain ? ». Il cherche dans les recettes, l'historique et sur le web, lance des minuteurs, gère les courses et la musique, et répond à voix haute. En ligne : seule la phrase dite après « robot » est envoyée (transcription et voix OpenAI, réponses Claude d'Anthropic). Il ne démarre jamais le moteur."),
             15f, Ui.TEXT2).apply { setLineSpacing(0f, 1.15f) })
         ia.addView(toggle(tr("Assistant activé"), a.prefs.assistantEnabled) { on ->
             a.prefs.assistantEnabled = on
@@ -306,6 +306,22 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         iaUrl = Ui.text(c, "", 15f, Ui.TEXT2).apply { setLineSpacing(0f, 1.15f) }
         iaQrRow.addView(iaUrl, Ui.lp(0, Ui.WRAP, 1f, l = 14))
         ia.addView(iaQrRow, Ui.lp(t = 8))
+        ia.addView(Ui.text(c, tr("Ville (météo et recherches locales)"), 16f, Ui.TEXT2), Ui.lp(t = 12))
+        val cityRow = Ui.horizontal(c)
+        val city = EditText(c).apply {
+            setText(a.prefs.assistantCity)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTextColor(Ui.TEXT)
+            setSingleLine()
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            hint = tr("ex. Nice")
+        }
+        cityRow.addView(city, Ui.lp(0, Ui.WRAP, 1f))
+        cityRow.addView(Ui.button(c, tr("Enregistrer"), Ui.Style.SECONDARY, null, height = 52) {
+            a.prefs.assistantCity = city.text.toString().trim()
+            a.toast(tr("Ville enregistrée"), Ui.OK)
+        }, Ui.lp(Ui.WRAP, Ui.WRAP, l = 10))
+        ia.addView(cityRow, Ui.lp(t = 6))
         ia.addView(Ui.text(c, tr("Modèle"), 16f, Ui.TEXT2), Ui.lp(t = 12))
         iaModelBox = Ui.horizontal(c)
         ia.addView(iaModelBox, Ui.lp(t = 6))

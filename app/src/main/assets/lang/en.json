@@ -612,12 +612,16 @@
   "enregistrée": "saved",
   "Plus fin (Sonnet)": "Smarter (Sonnet)",
   "Clé Anthropic : %s · Clé OpenAI : %s": "Anthropic key: %s · OpenAI key: %s",
-  "Conversation libre avec le robot : « robot, j'ai faim, qu'est-ce que tu me proposes ce soir ? ». Il cherche dans les recettes et l'historique, lance des minuteurs, gère les courses et la musique, et répond à voix haute. En ligne : seule la phrase dite après « robot » est envoyée (transcription et voix OpenAI, réponses Claude d'Anthropic). Il ne démarre jamais le moteur.": "Free conversation with the robot: “robot, I'm hungry, what do you suggest for dinner?”. It searches the recipes and history, starts timers, manages shopping and music, and answers out loud. Online: only the sentence said after “robot” is sent (OpenAI transcription and voice, Claude answers from Anthropic). It never starts the motor.",
   "Activez « Réception depuis le téléphone » pour saisir les clés.": "Enable “Receive from phone” to enter the keys.",
   "Activez aussi la commande vocale (mot d'appel « robot »).": "Also enable voice control (wake word “robot”).",
   "manquante": "missing",
   "Tester la voix": "Test the voice",
   "Scannez avec le téléphone pour coller les clés API (elles ne s'affichent jamais en clair).": "Scan with your phone to paste the API keys (they are never shown in clear).",
   "Voix": "Voice",
-  "Modèle": "Model"
+  "Modèle": "Model",
+  "ex. Nice": "e.g. Nice",
+  "Ville enregistrée": "City saved",
+  "Enregistrer": "Save",
+  "Ville (météo et recherches locales)": "City (weather and local searches)",
+  "Conversation libre avec le robot, sur n'importe quel sujet : « robot, j'ai faim, qu'est-ce que tu me proposes ce soir ? », « robot, quel temps fera-t-il demain ? ». Il cherche dans les recettes, l'historique et sur le web, lance des minuteurs, gère les courses et la musique, et répond à voix haute. En ligne : seule la phrase dite après « robot » est envoyée (transcription et voix OpenAI, réponses Claude d'Anthropic). Il ne démarre jamais le moteur.": "Free conversation with the robot, on any topic: “robot, I'm hungry, what do you suggest for dinner?”, “robot, what will the weather be tomorrow?”. It searches the recipes, history and the web, starts timers, manages shopping and music, and answers out loud. Online: only the sentence said after “robot” is sent (OpenAI transcription and voice, Claude answers from Anthropic). It never starts the motor."
 }
