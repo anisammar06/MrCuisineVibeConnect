@@ -83,6 +83,7 @@ class VoiceService : Service() {
         val assistant = prefs.assistantReady
         var awaitUntil = 0L
         var pending: List<String> = emptyList()
+        var awaitFrom = -1L
         // Mémoire des 20 dernières secondes de son brut, pour envoyer la phrase entière à l'assistant.
         val ring = ShortArray(RATE * 20)
         var total = 0L
@@ -168,6 +169,9 @@ class VoiceService : Service() {
                     if (assistant) {
                         val alone = after != null && raw(text).dropWhile { it !in Voice.WAKE[lang].orEmpty() }.drop(1).isEmpty()
                         if (alone) {
+                            // Le moteur coupe souvent juste après « robot » alors que la phrase continue :
+                            // on garde le son depuis le début de ce morceau pour ne pas en perdre le début.
+                            awaitFrom = segStart
                             awaitUntil = now + 6000
                             beep?.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
                             heard(text, "j'écoute…")
@@ -176,7 +180,9 @@ class VoiceService : Service() {
                         pending = emptyList()
                         awaitUntil = 0
                         heard(text, "→ assistant")
-                        ask(ring, total, segStart, lang, cmd?.let { joined.joinToString(" ") }.orEmpty())
+                        val from = if (after == null && awaitFrom >= 0 && total - awaitFrom < ring.size - VoiceService.RATE) awaitFrom else segStart
+                        awaitFrom = -1L
+                        ask(ring, total, from, lang, cmd?.let { joined.joinToString(" ") }.orEmpty())
                         continue
                     }
                     if (joined.isEmpty()) {
