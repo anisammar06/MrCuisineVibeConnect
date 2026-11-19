@@ -594,5 +594,8 @@
   "Hors ligne : rien n'est envoyé sur Internet. Dites « robot » puis la commande, par exemple « robot, minuteur pâtes huit minutes » ou « robot, étape suivante ». La voix peut mettre en pause ou arrêter une cuisson, jamais démarrer le moteur.": "Offline: nothing is sent over the Internet. Say “robot” then the command, for example “robot, minuteur pâtes huit minutes” or “robot, étape suivante”. Voice can pause or stop cooking, never start the motor.",
   "Pas compris : « %s »": "Not understood: “%s”",
   "Mot d'appel « robot » obligatoire": "Wake word “robot” required",
-  "Voix %s à télécharger (environ 45 Mo, une seule fois).": "Voice %s to download (about 45 MB, once)."
+  "Voix %s à télécharger (environ 45 Mo, une seule fois).": "Voice %s to download (about 45 MB, once).",
+  "Dernières phrases reconnues :": "Last recognised phrases:",
+  "Rien reconnu pour l'instant.": "Nothing recognised yet.",
+  "Niveau du micro : %d %%": "Microphone level: %d %%"
 }

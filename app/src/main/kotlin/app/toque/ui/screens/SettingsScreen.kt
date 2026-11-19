@@ -50,6 +50,12 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
     private lateinit var voiceText: TextView
     private lateinit var voiceBtn: LinearLayout
     private var voiceBusy = false
+    private val voiceTick = object : Runnable {
+        override fun run() {
+            if (a.prefs.voiceEnabled && !voiceBusy) renderVoice()
+            view.postDelayed(this, 3000)
+        }
+    }
     private lateinit var tmLogin: LinearLayout
     private lateinit var tmActions: LinearLayout
     private var unsubTm: (() -> Unit)? = null
@@ -543,8 +549,11 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         val lang = a.prefs.voiceLang
         val ok = VoiceModels.installed(a, lang)
         if (!voiceBusy) {
+            val st = if (a.prefs.voiceEnabled) VoiceModels.status(a) else null
             voiceText.text = if (ok) tr("Voix installée (%s).", lang.uppercase()) +
-                (if (a.prefs.voiceEnabled) " " + tr("Le robot écoute.") else "")
+                (if (a.prefs.voiceEnabled) " " + tr("Le robot écoute.") else "") +
+                (if (st != null) "\n" + tr("Niveau du micro : %d %%", st.first) +
+                    (if (st.second.isEmpty()) "\n" + tr("Rien reconnu pour l'instant.") else "\n" + tr("Dernières phrases reconnues :") + "\n" + st.second.joinToString("\n")) else "")
             else tr("Voix %s à télécharger (environ 45 Mo, une seule fois).", lang.uppercase())
         }
         voiceBtn.visibility = if (ok || voiceBusy) View.GONE else View.VISIBLE
@@ -710,6 +719,7 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         unsubProgress = SyncProgress.onChange { if (SyncProgress.running) syncText.text = SyncProgress.text else if (!syncing) refreshSync() }
         if (SyncProgress.running) syncText.text = SyncProgress.text
         unsubTm = CookidooProgress.onChange { renderCookidoo() }
+        view.post(voiceTick)
         renderCookidoo()
     }
 
@@ -718,6 +728,7 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         unsubProgress = null
         unsubTm?.invoke()
         unsubTm = null
+        view.removeCallbacks(voiceTick)
     }
 
     override fun onSnapshot(s: Snapshot) {

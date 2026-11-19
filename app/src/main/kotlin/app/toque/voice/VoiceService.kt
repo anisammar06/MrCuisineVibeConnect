@@ -78,7 +78,7 @@ class VoiceService : Service() {
             val rate = 16_000
             val min = AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
             val rec = try {
-                AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, rate, AudioFormat.CHANNEL_IN_MONO,
+                AudioRecord(MediaRecorder.AudioSource.MIC, rate, AudioFormat.CHANNEL_IN_MONO,
                     AudioFormat.ENCODING_PCM_16BIT, maxOf(min, 8192))
             } catch (e: Exception) {
                 null
@@ -92,12 +92,22 @@ class VoiceService : Service() {
             try {
                 rec.startRecording()
                 val buf = ShortArray(1600) // 0,1 s
+                var peak = 0
+                var lastLevel = System.currentTimeMillis()
                 while (running && System.currentTimeMillis() >= pauseUntil) {
                     val n = rec.read(buf, 0, buf.size)
                     if (n <= 0) continue
+                    for (k in 0 until n) { val v = Math.abs(buf[k].toInt()); if (v > peak) peak = v }
+                    if (System.currentTimeMillis() - lastLevel > 5000) {
+                        level = peak * 100 / 32767
+                        peak = 0
+                        lastLevel = System.currentTimeMillis()
+                        writeStatus()
+                    }
                     if (!recognizer.acceptWaveForm(buf, n)) continue
                     val text = Json.parse(recognizer.result).obj().str("text").orEmpty().trim()
                     if (text.isEmpty()) continue
+                    heard(text)
                     val now = System.currentTimeMillis()
                     val words: List<String>? = when {
                         !requireWake -> Voice.afterWake(text, lang) ?: text.split(' ')
@@ -134,6 +144,26 @@ class VoiceService : Service() {
     }
 
     private fun log(s: String) = ToqueApp.of(this).log.write("voix", s)
+
+    // Diagnostic affiché dans les réglages : niveau du micro et dernières phrases reconnues.
+    @Volatile private var level = 0
+    private val lastHeard = ArrayList<String>()
+
+    private fun heard(text: String) {
+        synchronized(lastHeard) {
+            lastHeard += java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.FRANCE).format(java.util.Date()) + "  " + text
+            while (lastHeard.size > 5) lastHeard.removeAt(0)
+        }
+        writeStatus()
+    }
+
+    private fun writeStatus() {
+        try {
+            val lines = synchronized(lastHeard) { lastHeard.toList() }
+            File(filesDir, "voix/etat.txt").writeText("niveau=$level\n" + lines.joinToString("\n"))
+        } catch (_: Exception) {
+        }
+    }
 
     override fun onDestroy() {
         running = false
@@ -245,4 +275,13 @@ object VoiceModels {
     }
 
     fun delete(c: Context, lang: String) = dir(c, lang).deleteRecursively()
+
+    /** Niveau du micro (0–100, sur les 5 dernières secondes) et dernières phrases reconnues. */
+    fun status(c: Context): Pair<Int, List<String>>? {
+        val f = File(c.filesDir, "voix/etat.txt")
+        if (!f.exists() || System.currentTimeMillis() - f.lastModified() > 15_000) return null
+        val lines = f.readLines()
+        val level = lines.firstOrNull()?.substringAfter('=')?.toIntOrNull() ?: 0
+        return level to lines.drop(1).filter { it.isNotBlank() }
+    }
 }
