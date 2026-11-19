@@ -15,6 +15,7 @@ import app.toque.core.json.Json
 import app.toque.core.json.obj
 import app.toque.core.json.str
 import app.toque.core.voice.Voice
+import app.toque.core.voice.VoiceCommand
 import org.vosk.LibVosk
 import org.vosk.LogLevel
 import org.vosk.Model
@@ -70,6 +71,7 @@ class VoiceService : Service() {
         }
         val requireWake = Prefs(this).voiceWake
         var awaitUntil = 0L
+        var pending: List<String> = emptyList()
         while (running) {
             if (System.currentTimeMillis() < pauseUntil) {
                 Thread.sleep(300)
@@ -121,27 +123,48 @@ class VoiceService : Service() {
                     if (!recognizer.acceptWaveForm(buf, n)) continue
                     val text = Json.parse(recognizer.result).obj().str("text").orEmpty().trim()
                     if (text.isEmpty()) continue
-                    heard(text)
                     val now = System.currentTimeMillis()
+                    val after = Voice.afterWake(text, lang)
                     val words: List<String>? = when {
-                        !requireWake -> Voice.afterWake(text, lang) ?: text.split(' ')
-                        now < awaitUntil -> Voice.afterWake(text, lang) ?: text.split(' ')
-                        else -> Voice.afterWake(text, lang)
+                        after != null -> after
+                        !requireWake || now < awaitUntil -> text.split(' ')
+                        else -> null
                     }
-                    if (words == null) continue
-                    if (words.isEmpty() || words.all { it == "[unk]" }) {
-                        // Mot d'appel seul : bip, la commande suit dans les 6 secondes.
+                    if (words == null) {
+                        heard(text, "ignoré (pas de « robot »)")
+                        continue
+                    }
+                    // Une commande dite en deux morceaux (« robot, minuteur » … « cinq minutes ») est recollée.
+                    val clean = words.filter { it != "[unk]" }
+                    val joined = if (after == null && now < awaitUntil) pending + clean else clean
+                    if (joined.isEmpty()) {
+                        pending = emptyList()
                         awaitUntil = now + 6000
                         beep?.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
                         VoiceReceiver.send(this, VoiceReceiver.LISTENING, text)
+                        heard(text, "j'écoute…")
                         continue
                     }
-                    awaitUntil = 0
-                    val cmd = Voice.parseTokens(words.filter { it != "[unk]" }, lang)
-                    if (cmd == null) VoiceReceiver.send(this, VoiceReceiver.UNKNOWN, text)
-                    else {
+                    val cmd = Voice.parseTokens(joined, lang)
+                    if (cmd == null) {
+                        if (pending.isEmpty() || after != null) {
+                            // Début de commande incomplet : on attend la suite 6 secondes.
+                            pending = joined.takeLast(8)
+                            awaitUntil = now + 6000
+                            beep?.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
+                            heard(text, "incomplet, j'attends la suite")
+                        } else {
+                            pending = emptyList()
+                            awaitUntil = 0
+                            VoiceReceiver.send(this, VoiceReceiver.UNKNOWN, joined.joinToString(" "))
+                            heard(text, "pas compris")
+                        }
+                    } else {
+                        pending = emptyList()
+                        awaitUntil = 0
                         beep?.startTone(ToneGenerator.TONE_PROP_ACK, 150)
-                        VoiceReceiver.sendCommand(this, cmd, text)
+                        VoiceReceiver.sendCommand(this, cmd, joined.joinToString(" "))
+                        heard(text, "→ " + describe(cmd))
                     }
                 }
             } catch (e: Exception) {
@@ -164,17 +187,33 @@ class VoiceService : Service() {
     @Volatile private var level = 0
     private val lastHeard = ArrayList<String>()
 
-    private fun heard(text: String) {
+    private fun heard(text: String, outcome: String) {
         synchronized(lastHeard) {
-            lastHeard += java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.FRANCE).format(java.util.Date()) + "  " + text
-            while (lastHeard.size > 5) lastHeard.removeAt(0)
+            if (lastHeard.isEmpty()) loadHeard()
+            lastHeard += java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.FRANCE).format(java.util.Date()) +
+                "  « " + text + " »  " + outcome
+            while (lastHeard.size > 6) lastHeard.removeAt(0)
         }
         writeStatus()
     }
 
+    // Les phrases précédentes survivent au redémarrage de l'écoute (changement de réglage).
+    private fun loadHeard() {
+        try {
+            val f = File(filesDir, "voix/etat.txt")
+            if (f.exists()) lastHeard += f.readLines().drop(1).filter { it.isNotBlank() }.takeLast(6)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun describe(c: VoiceCommand): String = when (c) {
+        is VoiceCommand.Timer -> "minuteur « ${c.name} » " + (c.seconds / 60).let { m -> if (c.seconds % 60 == 0) "$m min" else "$m min ${c.seconds % 60} s" }
+        else -> c.javaClass.simpleName
+    }
+
     private fun writeStatus() {
         try {
-            val lines = synchronized(lastHeard) { lastHeard.toList() }
+            val lines = synchronized(lastHeard) { if (lastHeard.isEmpty()) loadHeard(); lastHeard.toList() }
             File(filesDir, "voix/etat.txt").writeText("niveau=$level\n" + lines.joinToString("\n"))
         } catch (_: Exception) {
         }

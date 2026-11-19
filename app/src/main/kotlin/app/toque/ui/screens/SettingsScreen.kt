@@ -256,10 +256,21 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         }, Ui.lp(t = 10))
         vo.addView(Ui.text(c, tr("Sensibilité du micro"), 16f, Ui.TEXT2), Ui.lp(t = 12))
         val gains = listOf(4 to tr("Normale"), 8 to tr("Forte"), 16 to tr("Très forte"), 24 to tr("Maximale"))
-        vo.addView(dropdown(gains.map { it.first.toString() to it.second }, a.prefs.voiceGain.toString()) { v ->
-            a.prefs.voiceGain = v.toInt()
-            VoiceService.restart(a.applicationContext)
-        }, Ui.lp(Ui.MATCH, Ui.u(58), t = 6))
+        val gainBox = Ui.horizontal(c)
+        fun renderGain() {
+            gainBox.removeAllViews()
+            for ((g, name) in gains) {
+                gainBox.addView(Ui.toggleChip(c, name, a.prefs.voiceGain == g) {
+                    if (a.prefs.voiceGain != g) {
+                        a.prefs.voiceGain = g
+                        VoiceService.restart(a.applicationContext)
+                        renderGain()
+                    }
+                }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
+            }
+        }
+        renderGain()
+        vo.addView(gainBox, Ui.lp(t = 6))
         vo.addView(Ui.text(c, tr("Langue écoutée (une à la fois)"), 16f, Ui.TEXT2), Ui.lp(t = 12))
         voiceLangBox = Ui.horizontal(c)
         vo.addView(voiceLangBox, Ui.lp(t = 6))
