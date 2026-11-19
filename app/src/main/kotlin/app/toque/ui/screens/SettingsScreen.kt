@@ -29,6 +29,7 @@ import app.toque.recipes.CookidooSync
 import app.toque.media.Received
 import app.toque.media.ReceiverService
 import app.toque.media.SpotifyService
+import app.toque.media.MicTest
 import app.toque.ui.Icon
 import app.toque.ui.MainActivity
 import app.toque.ui.Screen
@@ -226,6 +227,18 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
                 SpotifyService.unlink(a.applicationContext)
                 a.toast(tr("Compte Spotify délié"), Ui.OK)
             }
+        }, Ui.lp(Ui.WRAP, Ui.WRAP, t = 10))
+
+        // ---- Micro
+        val mic = section(right, tr("Micro"), Icon.Kind.PLAY)
+        mic.addView(Ui.text(c, tr("Touchez « Tester », puis parlez près du robot pendant 5 secondes : la jauge doit bouger."), 15f, Ui.TEXT2)
+            .apply { setLineSpacing(0f, 1.15f) })
+        val micBar = app.toque.ui.ProgressLine(c)
+        mic.addView(micBar, Ui.lp(Ui.MATCH, Ui.u(10), t = 12))
+        val micText = Ui.text(c, "", 16f, Ui.TEXT)
+        mic.addView(micText, Ui.lp(t = 8))
+        mic.addView(Ui.button(c, tr("Tester le micro"), Ui.Style.SECONDARY, Icon.Kind.PLAY, height = 52) {
+            MicTest.run(a, { level -> view.post { micBar.progress = level } }) { msg -> view.post { micText.text = msg } }
         }, Ui.lp(Ui.WRAP, Ui.WRAP, t = 10))
 
         // ---- Réception (Médias)

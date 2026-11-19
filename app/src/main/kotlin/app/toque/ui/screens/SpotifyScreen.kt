@@ -159,6 +159,7 @@ class SpotifyScreen(a: MainActivity) : Screen(a) {
     }
 
     override fun onShow() {
+        app.toque.media.MediaRemote.spotifyScreenVisible = true
         SpotifyService.start(c)
         shown = true
         view.removeCallbacks(tick)
@@ -166,6 +167,7 @@ class SpotifyScreen(a: MainActivity) : Screen(a) {
     }
 
     override fun onHide() {
+        app.toque.media.MediaRemote.spotifyScreenVisible = false
         shown = false
         view.removeCallbacks(tick)
     }

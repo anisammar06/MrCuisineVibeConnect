@@ -563,5 +563,16 @@
   "Compte Spotify délié": "Spotify account unlinked",
   "Le robot apparaît comme enceinte « %s » dans l'appli Spotify (compte Premium). Premier appairage : Médias › Spotify.": "The robot shows up as the “%s” speaker in the Spotify app (Premium account). First pairing: Media › Spotify.",
   "Première fois : scannez le code avec le téléphone, ou allez sur spotify.com/pair et saisissez :": "First time: scan the code with the phone, or go to spotify.com/pair and enter:",
-  "Volume %d %%": "Volume %d %%"
+  "Volume %d %%": "Volume %d %%",
+  "Signal constant (pic %d %%, moyenne %d) : probablement pas de vrai micro.": "Constant signal (peak %d %%, average %d): probably no real microphone.",
+  "Micro inaccessible : %s": "Microphone unavailable: %s",
+  "Écoute… parlez maintenant.": "Listening… speak now.",
+  "Aucun son reçu : pas de micro branché (signal nul).": "No sound received: no microphone connected (zero signal).",
+  "Touchez « Tester », puis parlez près du robot pendant 5 secondes : la jauge doit bouger.": "Tap “Test”, then speak near the robot for 5 seconds: the gauge should move.",
+  "Micro": "Microphone",
+  "Micro inaccessible (déjà utilisé ou absent).": "Microphone unavailable (in use or missing).",
+  "Micro détecté : pic %d %% (silence %d %%). La commande vocale est possible.": "Microphone found: peak %d %% (silence %d %%). Voice control is possible.",
+  "Aucune entrée micro sur ce robot.": "No microphone input on this robot.",
+  "Tester le micro": "Test the microphone",
+  "Autorisation du micro refusée.": "Microphone permission refused."
 }

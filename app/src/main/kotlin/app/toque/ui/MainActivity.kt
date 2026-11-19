@@ -1,6 +1,8 @@
 package app.toque.ui
 
+import app.toque.ui.screens.SpotifyScreen
 import app.toque.media.SpotifyService
+import app.toque.media.MediaRemote
 import app.toque.recipes.CookidooClient
 import app.toque.recipes.CookidooSync
 import app.toque.kitchen.Timers
@@ -102,12 +104,27 @@ class MainActivity : Activity() {
         }
         ReceiverService.start(this)
         SpotifyService.start(applicationContext)
+        MediaRemote.start(applicationContext)
         SyncService.schedule(this)
         push(HomeScreen(this))
+        handleOpen(intent)
         if (reopenSettings) {
             reopenSettings = false
             push(SettingsScreen(this))
         }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        handleOpen(intent)
+    }
+
+    /** Ouverture d'un écran demandée de l'extérieur (télécommande flottante). */
+    private fun handleOpen(i: Intent?) {
+        when (i?.getStringExtra(EXTRA_OPEN)) {
+            "spotify" -> if (current !is SpotifyScreen) push(SpotifyScreen(this))
+        }
+        i?.removeExtra(EXTRA_OPEN)
     }
 
     /** Applique la langue choisie dans les réglages : l'interface est reconstruite, on revient aux réglages. */
@@ -457,6 +474,7 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        const val EXTRA_OPEN = "app.toque.OUVRIR"
         private var reopenSettings = false
 
         /** MotionEvent.AXIS_SCROLL (API 26), valeur fixe pour Android 6. */
