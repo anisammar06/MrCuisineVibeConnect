@@ -20,7 +20,7 @@ import app.toque.ui.Screen
 import app.toque.ui.Ui
 
 /** Fiche recette : ingrédients à gauche, étapes à droite, « Cuisiner » pour le pas-à-pas. */
-class RecipeScreen(a: MainActivity, private val recipe: Recipe, private val repo: app.toque.recipes.RecipeRepo = a.app.recipes) : Screen(a) {
+class RecipeScreen(a: MainActivity, val recipe: Recipe, private val repo: app.toque.recipes.RecipeRepo = a.app.recipes) : Screen(a) {
     override val title = recipe.title
     private lateinit var favIcon: Icon
     private lateinit var favLabel: TextView

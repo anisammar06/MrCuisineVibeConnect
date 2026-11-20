@@ -31,8 +31,10 @@ import app.toque.ui.Ui
  * eux partent ensemble, en un seul programme : la machine passe de l'un à l'autre sans arrêter
  * la lame (sauf changement de sens). La progression est mémorisée (reprise après coupure).
  */
-class CookScreen(a: MainActivity, private val recipe: Recipe, startStep: Int) : Screen(a) {
+class CookScreen(a: MainActivity, val recipe: Recipe, startStep: Int) : Screen(a) {
     override val title = recipe.title
+    /** Étape affichée (pour l'assistant). */
+    val stepIndex: Int get() = index
     private var index = startStep.coerceIn(0, maxOf(0, recipe.steps.size - 1))
     private val reviewed = HashSet<Int>()
     private val done = HashSet<Int>()

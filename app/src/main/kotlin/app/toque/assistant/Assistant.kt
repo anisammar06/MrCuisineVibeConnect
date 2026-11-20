@@ -13,7 +13,10 @@ import app.toque.core.json.list
 import app.toque.core.json.obj
 import app.toque.core.json.str
 import app.toque.kitchen.Timers
+import app.toque.core.recipes.Recipe
 import app.toque.ui.MainActivity
+import app.toque.ui.screens.CookScreen
+import app.toque.ui.screens.RecipeScreen
 import app.toque.voice.VoiceService
 import java.io.File
 import java.io.IOException
@@ -185,7 +188,13 @@ object Assistant {
         val t = System.currentTimeMillis()
         val timers = Timers.get(c).timers.filter { !it.dismissed && it.leftMs(t) > 0 }
             .joinToString(", ") { "${it.name} (${it.leftMs(t) / 1000} s restantes${if (it.paused) ", en pause" else ""})" }
-        val screen = MainActivity.instance?.current?.title.orEmpty()
+        val cur = MainActivity.instance?.current
+        val screen = cur?.title.orEmpty()
+        val recipeCtx = when (cur) {
+            is CookScreen -> "\nLa personne CUISINE EN CE MOMENT (cuisson guidée) : « ${cur.recipe.title} », étape ${cur.stepIndex + 1} sur ${cur.recipe.steps.size}.\n" + describe(cur.recipe)
+            is RecipeScreen -> "\nRecette affichée à l'écran : « ${cur.recipe.title} ».\n" + describe(cur.recipe)
+            else -> ""
+        }
         val snap = ToqueApp.of(c).machine.snapshot
         val machine = when {
             snap == null -> "inconnu"
@@ -204,7 +213,24 @@ Pour la météo, l'actualité, les horaires, les prix, les résultats sportifs o
 Pour la cuisine, utilise les outils des recettes du robot (Lidl et Thermomix, français et polonais) et l'historique de ce qui a été cuisiné, pour proposer des choses variées (évite ce qui a été fait ces derniers jours, sauf demande). Quand la personne choisit une recette, ouvre-la à l'écran avec open_recipe. Tu peux aussi lancer des minuteurs, gérer la liste de courses et la musique.
 SÉCURITÉ : tu ne peux jamais démarrer le moteur, chauffer ou lancer une étape ; c'est la personne qui appuie sur Démarrer à l'écran. Tu peux seulement mettre en pause ou arrêter.
 Si tu poses une question, la personne peut répondre directement sans redire ton prénom.
-Contexte : nous sommes le $day. Écran affiché : ${screen.ifEmpty { "accueil" }}. Robot : $machine. Minuteurs en cours : ${timers.ifEmpty { "aucun" }}."""
+Tu cuisines AVEC la personne, comme si tu étais à côté d'elle : quand une recette est affichée ou en cours, tu la connais (détail ci-dessous). Explique les étapes, les gestes, les termes, les substitutions d'ingrédients et l'adaptation des quantités. Si quelque chose ne se passe pas comme prévu (trop liquide, ça accroche, pâte qui ne lève pas, ingrédient manquant…), pose au besoin une question courte, appuie-toi d'abord sur la recette puis cherche sur le web, et donne une solution concrète et immédiate. Tu peux passer à l'étape suivante ou précédente avec cook_step.
+Tu peux ouvrir n'importe quel écran de l'appli avec open_screen (liste de courses, minuteurs, recettes, balance, Spotify, réglages…) et d'autres applications du robot avec open_app. Quand on te demande d'ouvrir ou d'afficher quelque chose, fais-le avec ces outils, puis confirme brièvement.
+Contexte : nous sommes le $day. Écran affiché : ${screen.ifEmpty { "accueil" }}. Robot : $machine. Minuteurs en cours : ${timers.ifEmpty { "aucun" }}.$recipeCtx"""
+    }
+
+    /** Recette complète (ingrédients et étapes) pour en parler avec la personne. */
+    private fun describe(r: Recipe): String {
+        val b = StringBuilder()
+        b.append("Pour ${r.servings} personnes").append(if (r.totalMinutes > 0) ", ${r.totalMinutes} min au total" else "").append(".\n")
+        b.append("Ingrédients : ").append(r.allIngredients.joinToString(" ; ") { it.display }).append("\n")
+        b.append("Étapes :\n")
+        r.steps.forEachIndexed { i, st ->
+            b.append(i + 1).append(". ").append(st.text.trim())
+            st.machine?.let { b.append(" [robot : ").append(it.summary).append("]") }
+            b.append("\n")
+        }
+        if (r.notes.isNotBlank()) b.append("Notes : ").append(r.notes.trim()).append("\n")
+        return b.toString().take(7000)
     }
 
     private fun apiError(body: String): String = try {

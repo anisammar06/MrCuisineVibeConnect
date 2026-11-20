@@ -16,7 +16,19 @@ import app.toque.kitchen.Timers
 import app.toque.media.MediaRemote
 import app.toque.recipes.RecipeRepo
 import app.toque.ui.MainActivity
+import app.toque.ui.Screen
+import app.toque.ui.screens.CookScreen
+import app.toque.ui.screens.CookidooSearchScreen
+import app.toque.ui.screens.ManualScreen
+import app.toque.ui.screens.MediaScreen
+import app.toque.ui.screens.ProgramsScreen
 import app.toque.ui.screens.RecipeScreen
+import app.toque.ui.screens.RecipesScreen
+import app.toque.ui.screens.ScaleScreen
+import app.toque.ui.screens.SettingsScreen
+import app.toque.ui.screens.ShoppingScreen
+import app.toque.ui.screens.SpotifyScreen
+import app.toque.ui.screens.TimersScreen
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -36,6 +48,10 @@ internal class Tools(private val c: Context) {
         "get_recipe" -> recipe(input.str("id").orEmpty())
         "cooking_history" -> history((input["limit"] as? Number)?.toInt() ?: 20)
         "open_recipe" -> open(input.str("id").orEmpty())
+        "open_screen" -> openScreen(input)
+        "open_app" -> openApp(input.str("name").orEmpty())
+        "list_apps" -> mapOf("apps" to launchable().map { it.first })
+        "cook_step" -> cookStep(input.str("action").orEmpty())
         "start_timer" -> startTimer(input)
         "stop_timer" -> stopTimer(input.str("name").orEmpty())
         "shopping_list" -> shopping(input)
@@ -94,24 +110,95 @@ internal class Tools(private val c: Context) {
         )
     }
 
-    private fun open(id: String): Any {
-        val (_, repo) = find(id) ?: return mapOf("error" to "recette introuvable")
-        val r = repo.get(id) ?: return mapOf("error" to "recette introuvable")
-        val a = MainActivity.instance
+    /** Exécute [block] sur le fil de l'interface, en ramenant Toque au premier plan si besoin. */
+    private fun onUi(block: (MainActivity) -> Any): Any {
+        val a = MainActivity.instance ?: return mapOf("error" to "écran de Toque indisponible")
+        var out: Any = mapOf("ok" to true)
         val done = CountDownLatch(1)
         Handler(Looper.getMainLooper()).post {
             try {
-                if (a != null) {
-                    if (!a.resumed) c.startActivity(Intent(c, MainActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
-                    a.push(RecipeScreen(a, r, repo))
-                }
+                if (!a.resumed) c.startActivity(Intent(c, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+                out = block(a)
+            } catch (e: Exception) {
+                out = mapOf("error" to (e.message ?: e.toString()))
             } finally {
                 done.countDown()
             }
         }
-        done.await(3, TimeUnit.SECONDS)
-        return if (a != null) mapOf("ok" to true, "opened" to r.title) else mapOf("error" to "écran de Toque indisponible")
+        done.await(4, TimeUnit.SECONDS)
+        return out
+    }
+
+    private fun open(id: String): Any {
+        val (_, repo) = find(id) ?: return mapOf("error" to "recette introuvable")
+        val r = repo.get(id) ?: return mapOf("error" to "recette introuvable")
+        return onUi { a -> a.push(RecipeScreen(a, r, repo)); mapOf("ok" to true, "opened" to r.title) }
+    }
+
+    private fun openScreen(input: Map<String, Any?>): Any {
+        val name = input.str("screen").orEmpty()
+        return onUi { a ->
+            val s: Screen? = when (name) {
+                "home" -> { a.home(); null }
+                "back" -> { a.back(); null }
+                "recipes" -> RecipesScreen(a)
+                "favorites" -> RecipesScreen(a, favorites = true)
+                "thermomix_recipes" -> RecipesScreen(a, thermomix = true)
+                "cookidoo_search" -> CookidooSearchScreen(a, input.str("query").orEmpty())
+                "shopping_list" -> ShoppingScreen(a)
+                "timers" -> TimersScreen(a)
+                "manual_cooking" -> ManualScreen(a)
+                "programs" -> ProgramsScreen(a)
+                "scale" -> ScaleScreen(a)
+                "media" -> MediaScreen(a)
+                "spotify" -> SpotifyScreen(a)
+                "settings" -> SettingsScreen(a)
+                "guided_cooking" -> {
+                    val cur = a.current
+                    if (cur is RecipeScreen) CookScreen(a, cur.recipe, 0)
+                    else return@onUi mapOf("error" to "ouvrez d'abord une recette")
+                }
+                else -> return@onUi mapOf("error" to "écran inconnu : $name")
+            }
+            if (s != null) {
+                if (name != "back" && a.current?.javaClass == s.javaClass && s !is CookScreen) a.back()
+                a.push(s)
+            }
+            mapOf("ok" to true, "screen" to name)
+        }
+    }
+
+    private fun cookStep(action: String): Any = onUi { a ->
+        val cur = a.current as? CookScreen ?: return@onUi mapOf("error" to "la cuisson guidée n'est pas affichée")
+        when (action) {
+            "next" -> cur.voiceNext()
+            "previous" -> cur.voicePrev()
+            else -> return@onUi mapOf("error" to "action inconnue")
+        }
+        mapOf("ok" to true, "step" to cur.stepIndex + 1, "total" to cur.recipe.steps.size)
+    }
+
+    /** Applications installées qu'on peut ouvrir (nom affiché → paquet). */
+    private fun launchable(): List<Pair<String, String>> {
+        val pm = c.packageManager
+        val i = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        return pm.queryIntentActivities(i, 0).map { it.loadLabel(pm).toString() to it.activityInfo.packageName }
+            .filter { it.second != c.packageName }.distinctBy { it.second }.sortedBy { it.first.lowercase() }
+    }
+
+    private fun norm(s: String) = java.text.Normalizer.normalize(s.lowercase(), java.text.Normalizer.Form.NFD)
+        .replace(Regex("\\p{M}+"), "").replace(Regex("[^a-z0-9]"), "")
+
+    private fun openApp(name: String): Any {
+        val apps = launchable()
+        val n = norm(name)
+        if (n.isEmpty()) return mapOf("apps" to apps.map { it.first })
+        val hit = apps.firstOrNull { norm(it.first) == n } ?: apps.firstOrNull { norm(it.first).contains(n) || n.contains(norm(it.first)) }
+            ?: return mapOf("error" to "application introuvable", "apps" to apps.map { it.first })
+        val launch = c.packageManager.getLaunchIntentForPackage(hit.second) ?: return mapOf("error" to "impossible d'ouvrir ${hit.first}")
+        c.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        return mapOf("ok" to true, "opened" to hit.first)
     }
 
     private fun startTimer(input: Map<String, Any?>): Any {
@@ -196,6 +283,18 @@ internal class Tools(private val c: Context) {
                 "limit" to p("integer", "nombre d'entrées (20 par défaut)"),
             )),
             tool("open_recipe", "Ouvre une recette à l'écran du robot (la personne lance ensuite la cuisson elle-même).", mapOf("id" to p("string", "id de la recette")), listOf("id")),
+            tool("open_screen", "Ouvre un écran de l'appli du robot : accueil, retour, recettes, favoris, recettes Thermomix, recherche Cookidoo, liste de courses, minuteurs, cuisson manuelle, programmes, balance, médias, Spotify, réglages, ou la cuisson guidée de la recette affichée.", mapOf(
+                "screen" to p("string", "écran", mapOf("enum" to listOf("home", "back", "recipes", "favorites", "thermomix_recipes", "cookidoo_search",
+                    "shopping_list", "timers", "manual_cooking", "programs", "scale", "media", "spotify", "settings", "guided_cooking"))),
+                "query" to p("string", "texte de recherche (cookidoo_search)"),
+            ), listOf("screen")),
+            tool("open_app", "Ouvre une autre application installée sur le robot (NewPipe, Legimi, Play Store, navigateur…), par son nom. Sans nom : liste des applis.", mapOf(
+                "name" to p("string", "nom de l'application"),
+            ), listOf("name")),
+            tool("list_apps", "Liste les applications installées qu'on peut ouvrir.", mapOf()),
+            tool("cook_step", "En cuisson guidée : passe à l'étape suivante ou revient à la précédente (n'exécute rien sur la machine).", mapOf(
+                "action" to p("string", "next ou previous", mapOf("enum" to listOf("next", "previous"))),
+            ), listOf("action")),
             tool("start_timer", "Lance un minuteur de cuisine.", mapOf(
                 "name" to p("string", "nom, ex. « Pâtes »"), "minutes" to p("number", "minutes"), "seconds" to p("number", "secondes en plus"),
             )),
