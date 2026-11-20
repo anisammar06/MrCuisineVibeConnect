@@ -356,6 +356,13 @@ class Prefs(context: Context) {
             p.edit().putString("assistantVoice", v).commit()
         }
 
+    /** Veille profonde permise : écran éteint, le robot s'endort et coupe le Wi-Fi (non par défaut). */
+    var deepSleepAllowed: Boolean
+        get() = p.getBoolean("deepSleepAllowed", false)
+        set(v) {
+            p.edit().putBoolean("deepSleepAllowed", v).commit()
+        }
+
     /** Mise en veille de l'écran après ce nombre de minutes sans toucher (0 = jamais). */
     var screenSleepMin: Int
         get() = p.getInt("screenSleepMin", 5)

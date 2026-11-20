@@ -643,5 +643,7 @@
   "Jamais": "Never",
   "5 min": "5 min",
   "2 min": "2 min",
-  "Mise en veille automatique de l'écran sans action. Il reste allumé pendant une cuisson, la cuisson guidée, un minuteur ou quand l'assistant parle ; un minuteur qui sonne ou l'assistant le rallument.": "Automatic screen sleep when idle. It stays on during cooking, guided cooking, a timer or while the assistant speaks; a ringing timer or the assistant turns it back on."
+  "Mise en veille automatique de l'écran sans action. Il reste allumé pendant une cuisson, la cuisson guidée, un minuteur ou quand l'assistant parle ; un minuteur qui sonne ou l'assistant le rallument.": "Automatic screen sleep when idle. It stays on during cooking, guided cooking, a timer or while the assistant speaks; a ringing timer or the assistant turns it back on.",
+  "Autoriser la mise en veille profonde du robot": "Allow the robot to deep sleep",
+  "Activée : écran éteint, le robot s'endort complètement. Il coupe le Wi-Fi ; les conversations avec l'assistant, la commande vocale, la musique Spotify et la réception depuis le téléphone ne fonctionnent plus jusqu'au réveil (bouton à l'arrière). Désactivée (conseillé) : le robot reste joignable écran éteint ; il consomme un peu plus.": "On: with the screen off, the robot fully sleeps. Wi-Fi turns off; assistant conversations, voice control, Spotify music and receiving from the phone stop until it wakes (back button). Off (recommended): the robot stays reachable with the screen off; it uses a little more power."
 }

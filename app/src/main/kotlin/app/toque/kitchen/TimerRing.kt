@@ -1,6 +1,7 @@
 package app.toque.kitchen
 
 import app.toque.ScreenPower
+import app.toque.Ring
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -63,6 +64,7 @@ class TimerRing : Service() {
     }
 
     private fun build() {
+        Ring.set(Ring.State.TIMER)
         if (root != null) return
         startedAt = System.currentTimeMillis()
         val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -129,6 +131,7 @@ class TimerRing : Service() {
     }
 
     override fun onDestroy() {
+        Ring.clear(Ring.State.TIMER)
         main.removeCallbacks(beep)
         unsub?.invoke()
         tone?.release()

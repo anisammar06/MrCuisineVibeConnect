@@ -157,6 +157,12 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         }
         renderSleep()
         screenSec.addView(sleepBox, Ui.lp(t = 10))
+        screenSec.addView(toggle(tr("Autoriser la mise en veille profonde du robot"), a.prefs.deepSleepAllowed) { on ->
+            a.prefs.deepSleepAllowed = on
+            ScreenPower.applyAwake(a.applicationContext)
+        }, Ui.lp(t = 14))
+        screenSec.addView(Ui.text(c, tr("Activée : écran éteint, le robot s'endort complètement. Il coupe le Wi-Fi ; les conversations avec l'assistant, la commande vocale, la musique Spotify et la réception depuis le téléphone ne fonctionnent plus jusqu'au réveil (bouton à l'arrière). Désactivée (conseillé) : le robot reste joignable écran éteint ; il consomme un peu plus."),
+            14f, Ui.TEXT2).apply { setLineSpacing(0f, 1.15f) }, Ui.lp(t = 4))
 
         val time = section(right, tr("Date et heure"), Icon.Kind.CLOCK)
         val zones = listOf(ZoneLookup.AUTO to tr("Automatique (d'après la connexion Internet)")) +

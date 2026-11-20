@@ -49,6 +49,8 @@ class ToqueApp : Application() {
         LanguageFiles.install(this, log)
         I18n.select(I18n.resolve(prefs.language, Locale.getDefault().language).code)
         if (!isMainProcess()) return
+        ScreenPower.applyAwake(this)
+        Thread { Ring.off() }.start()
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             try {

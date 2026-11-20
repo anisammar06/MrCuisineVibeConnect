@@ -8,6 +8,7 @@ import android.os.Looper
 import android.widget.Toast
 import app.toque.ToqueApp
 import app.toque.ScreenPower
+import app.toque.Ring
 import app.toque.assistant.Assistant
 import app.toque.core.i18n.tr
 import app.toque.core.kitchen.TimerBoard
@@ -27,7 +28,7 @@ class VoiceReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, i: Intent) {
         val heard = i.getStringExtra(EXTRA_TEXT).orEmpty()
         when (i.getStringExtra(EXTRA_KIND)) {
-            LISTENING -> feedback(c, tr("J'écoute…"))
+            LISTENING -> { Ring.set(Ring.State.LISTENING, 7_000); feedback(c, tr("J'écoute…")) }
             UNKNOWN -> feedback(c, tr("Pas compris : « %s »", heard))
             COMMAND -> execute(c, decode(i) ?: return, heard)
             ASK -> {
@@ -43,6 +44,8 @@ class VoiceReceiver : BroadcastReceiver() {
 
     private fun execute(c: Context, cmd: VoiceCommand, heard: String) {
         ScreenPower.wake(c, 10_000)
+        Ring.clear(Ring.State.LISTENING)
+        Ring.set(Ring.State.SPEAKING, 700)
         val app = ToqueApp.of(c)
         val snap = app.machine.snapshot
         val cooking = snap?.busy == true

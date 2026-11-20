@@ -39,6 +39,7 @@ class VoiceService : Service() {
     @Volatile private var pauseUntil = 0L
     /** Fenêtre de suite de conversation (sans mot d'appel) après une réponse de l'assistant. */
     @Volatile private var followUntil = 0L
+    @Volatile private var listenRequest = false
     private var thread: Thread? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -50,6 +51,10 @@ class VoiceService : Service() {
             return START_NOT_STICKY
         }
         intent?.getLongExtra(EXTRA_PAUSE_MS, 0L)?.takeIf { it > 0 }?.let { pauseUntil = System.currentTimeMillis() + it }
+        if (intent?.getBooleanExtra(EXTRA_LISTEN, false) == true) {
+            pauseUntil = 0
+            listenRequest = true
+        }
         if (intent?.getBooleanExtra(EXTRA_RESUME, false) == true) {
             pauseUntil = 0
             // Le micro met ~1 s à repartir : la fenêtre compte depuis la reprise.
@@ -133,6 +138,17 @@ class VoiceService : Service() {
                         if (v > peak) peak = v
                     }
                     total += n
+                    if (listenRequest) {
+                        // Appui long sur le bouton : on écoute la phrase qui suit, sans mot d'appel.
+                        listenRequest = false
+                        awaitFrom = total
+                        awaitUntil = System.currentTimeMillis() + 7000
+                        recognizer.reset()
+                        uttStart = total
+                        beep?.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
+                        VoiceReceiver.send(this, VoiceReceiver.LISTENING, "")
+                        heard("(bouton)", "j'écoute…")
+                    }
                     if (System.currentTimeMillis() - lastLevel > 5000) {
                         level = peak * 100 / 32767
                         peak = 0
@@ -176,6 +192,7 @@ class VoiceService : Service() {
                             awaitFrom = segStart
                             awaitUntil = now + 6000
                             ScreenPower.wake(this, 10_000)
+                            VoiceReceiver.send(this, VoiceReceiver.LISTENING, text)
                             beep?.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
                             heard(text, "j'écoute…")
                             continue
@@ -302,6 +319,12 @@ class VoiceService : Service() {
     companion object {
         const val EXTRA_PAUSE_MS = "pause_ms"
         const val EXTRA_RESUME = "resume"
+        const val EXTRA_LISTEN = "listen"
+
+        /** Écoute la prochaine phrase sans mot d'appel (appui long sur le bouton). */
+        fun listenNow(c: Context) {
+            if (Prefs(c).voiceEnabled) c.startService(Intent(c, VoiceService::class.java).putExtra(EXTRA_LISTEN, true))
+        }
         const val EXTRA_FOLLOW = "follow"
         const val RATE = 16_000
 

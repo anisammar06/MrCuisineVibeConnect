@@ -6,6 +6,7 @@ import android.media.MediaPlayer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import app.toque.Prefs
+import app.toque.Ring
 import app.toque.ScreenPower
 import app.toque.ToqueApp
 import app.toque.core.json.Json
@@ -56,13 +57,17 @@ object Assistant {
         val app = c.applicationContext
         exec.execute {
             VoiceService.pauseFor(app, 60_000)
-            try { speak(app, text) } finally { VoiceService.resume(app, follow = false) }
+            interrupted = false
+            busy = true
+            try { speak(app, text) } finally { busy = false; VoiceService.resume(app, follow = false) }
         }
     }
 
     private fun run(c: Context, lang: String, offline: () -> Boolean = { false }, question: () -> String) {
         busy = true
+        interrupted = false
         ScreenPower.wake(c, 20_000)
+        Ring.set(Ring.State.THINKING)
         var follow = false
         try {
             Bubble.show(c, "", pick(lang, "J'écoute…", "Słucham…"))
@@ -77,10 +82,11 @@ object Assistant {
             Bubble.show(c, q, answer)
             ToqueApp.of(c).log.write("assistant", "« $q » → « ${answer.take(200)} »")
             speak(c, answer)
-            follow = true
+            follow = !interrupted
             Bubble.hideLater(15_000)
         } catch (e: Exception) {
             ToqueApp.of(c).log.write("assistant", "erreur : $e")
+            Ring.set(Ring.State.ALERT, 3_000)
             if (e is IOException && offline()) {
                 Bubble.hideLater(0)
                 return
@@ -91,6 +97,9 @@ object Assistant {
             Bubble.hideLater(10_000)
         } finally {
             busy = false
+            Ring.clear(Ring.State.THINKING)
+            Ring.clear(Ring.State.SPEAKING)
+            if (follow) Ring.set(Ring.State.LISTENING, 9_000)
             VoiceService.resume(c, follow)
         }
     }
@@ -241,7 +250,27 @@ Contexte : nous sommes le $day. Écran affiché : ${screen.ifEmpty { "accueil" }
 
     // ------------------------------------------------------------------ voix (OpenAI, sinon Android)
 
+    @Volatile private var interrupted = false
+    @Volatile private var player: MediaPlayer? = null
+    @Volatile private var playing: CountDownLatch? = null
+    @Volatile private var engineRef: TextToSpeech? = null
+
+    /** Coupe la parole (appui sur le bouton pendant qu'elle parle). */
+    fun interrupt() {
+        interrupted = true
+        try { player?.stop() } catch (_: Exception) {}
+        try { engineRef?.stop() } catch (_: Exception) {}
+        playing?.countDown()
+    }
+
     private fun speak(c: Context, text: String) {
+        if (interrupted) return
+        Ring.clear(Ring.State.THINKING)
+        Ring.set(Ring.State.SPEAKING)
+        try { speakNow(c, text) } finally { Ring.clear(Ring.State.SPEAKING) }
+    }
+
+    private fun speakNow(c: Context, text: String) {
         val p = Prefs(c)
         val lang = if (Regex("[ąćęłńśźż]", RegexOption.IGNORE_CASE).containsMatchIn(text)) "pl" else p.voiceLang
         try {
@@ -271,6 +300,8 @@ Contexte : nous sommes le $day. Écran affiché : ${screen.ifEmpty { "accueil" }
         am.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
         val done = CountDownLatch(1)
         val mp = MediaPlayer()
+        player = mp
+        playing = done
         try {
             mp.setAudioStreamType(AudioManager.STREAM_MUSIC)
             mp.setDataSource(f.path)
@@ -287,6 +318,8 @@ Contexte : nous sommes le $day. Écran affiché : ${screen.ifEmpty { "accueil" }
             mp.start()
             done.await(maxOf(5_000L, (mp.duration / speed).toLong() + 3_000), TimeUnit.MILLISECONDS)
         } finally {
+            player = null
+            playing = null
             mp.release()
             @Suppress("DEPRECATION")
             am.abandonAudioFocus(null)
@@ -306,6 +339,7 @@ Contexte : nous sommes le $day. Écran affiché : ${screen.ifEmpty { "accueil" }
             return
         }
         val engine = tts ?: return
+        engineRef = engine
         try {
             engine.language = if (lang == "pl") Locale("pl", "PL") else Locale.FRANCE
             engine.setSpeechRate(Prefs(c).assistantSpeed.coerceIn(80, 200) / 100f)
@@ -317,8 +351,11 @@ Contexte : nous sommes le $day. Écran affiché : ${screen.ifEmpty { "accueil" }
                 override fun onError(id: String?) = done.countDown()
             })
             engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "toque")
+            playing = done
             done.await(60, TimeUnit.SECONDS)
         } finally {
+            playing = null
+            engineRef = null
             engine.shutdown()
         }
     }

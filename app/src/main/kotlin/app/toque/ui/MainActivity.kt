@@ -8,6 +8,7 @@ import app.toque.recipes.CookidooClient
 import app.toque.recipes.CookidooSync
 import app.toque.kitchen.Timers
 import app.toque.ScreenPower
+import app.toque.Ring
 import app.toque.assistant.Assistant
 import app.toque.ui.screens.CookScreen
 import app.toque.media.ReceiverService
@@ -281,23 +282,55 @@ class MainActivity : Activity() {
 
     // ------------------------------------------------------------------ bouton rotatif
 
+    private var pressDown = false
+    private var longFired = false
+    /** Appui long sur le bouton : parler à l'assistant sans dire son prénom. */
+    private val longPress = Runnable {
+        longFired = true
+        if (prefs.voiceEnabled) {
+            if (Assistant.busy) Assistant.interrupt()
+            VoiceService.listenNow(applicationContext)
+        }
+    }
+
+    private fun isPress(k: Int) = prefs.knobPress.let {
+        if (it >= 0) it == k else k == KeyEvent.KEYCODE_DPAD_CENTER || k == KeyEvent.KEYCODE_ENTER
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         knobListener?.let { l ->
             if (event.action == KeyEvent.ACTION_DOWN) l(event)
             return true
         }
+        val k = event.keyCode
+        if (isPress(k) && overlay.visibility != View.VISIBLE && currentFocus !is android.widget.EditText) {
+            // L'appui court agit au relâchement, pour distinguer l'appui long (assistant).
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (event.repeatCount == 0) {
+                    pressDown = true
+                    longFired = false
+                    root.removeCallbacks(longPress)
+                    root.postDelayed(longPress, 700)
+                }
+                return true
+            }
+            if (event.action == KeyEvent.ACTION_UP && pressDown) {
+                pressDown = false
+                root.removeCallbacks(longPress)
+                if (!longFired) {
+                    if (Assistant.busy) Assistant.interrupt() // appui pendant qu'elle parle : on la coupe
+                    else current?.onKnobPress()
+                }
+                return true
+            }
+        }
         if (event.action == KeyEvent.ACTION_DOWN && overlay.visibility != View.VISIBLE) {
-            val k = event.keyCode
             val left = prefs.knobLeft.let { if (it >= 0) it == k else k == KeyEvent.KEYCODE_DPAD_LEFT }
             val right = prefs.knobRight.let { if (it >= 0) it == k else k == KeyEvent.KEYCODE_DPAD_RIGHT }
-            val press = prefs.knobPress.let {
-                if (it >= 0) it == k else k == KeyEvent.KEYCODE_DPAD_CENTER || k == KeyEvent.KEYCODE_ENTER
-            }
             val s = current
             if (s != null && currentFocus !is android.widget.EditText) {
                 if (left && s.onKnob(-1)) return true
                 if (right && s.onKnob(1)) return true
-                if (press && s.onKnobPress()) return true
             }
         }
         return super.dispatchKeyEvent(event)
@@ -322,7 +355,7 @@ class MainActivity : Activity() {
         current?.onEvent(e)
         when (e.type) {
             EventType.JOB_FINISHED -> chime(2)
-            EventType.FAULT -> { chime(3); toast(e.message, Ui.DANGER) }
+            EventType.FAULT -> { chime(3); toast(e.message, Ui.DANGER); Ring.set(Ring.State.ALERT, 10_000) }
             EventType.LID_OPENED -> if (snapshot.busy || snapshot.state != null) toast(tr("Couvercle ouvert : pause"), Ui.WARN)
             EventType.JOB_PAUSED -> if (e.message != PauseReason.USER.label) toast(e.message, Ui.WARN)
             EventType.TURBO_END -> toast(e.message, Ui.TEXT2)
