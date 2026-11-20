@@ -28,6 +28,9 @@ import app.toque.ui.screens.ScaleScreen
 import app.toque.ui.screens.SettingsScreen
 import app.toque.ui.screens.ShoppingScreen
 import app.toque.ui.screens.SpotifyScreen
+import app.toque.ui.screens.SpotifyLibraryScreen
+import app.toque.media.SpotifyApi
+import app.toque.media.SpotifyService
 import app.toque.ui.screens.TimersScreen
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -52,6 +55,7 @@ internal class Tools(private val c: Context) {
         "open_app" -> openApp(input.str("name").orEmpty())
         "list_apps" -> mapOf("apps" to launchable().map { it.first })
         "cook_step" -> cookStep(input.str("action").orEmpty())
+        "spotify" -> spotify(input)
         "start_timer" -> startTimer(input)
         "stop_timer" -> stopTimer(input.str("name").orEmpty())
         "shopping_list" -> shopping(input)
@@ -153,6 +157,7 @@ internal class Tools(private val c: Context) {
                 "scale" -> ScaleScreen(a)
                 "media" -> MediaScreen(a)
                 "spotify" -> SpotifyScreen(a)
+                "spotify_library" -> SpotifyLibraryScreen(a)
                 "settings" -> SettingsScreen(a)
                 "guided_cooking" -> {
                     val cur = a.current
@@ -238,6 +243,49 @@ internal class Tools(private val c: Context) {
         return mapOf("items" to Shopping.get(c).items.map { (if (it.done) "[pris] " else "") + it.display })
     }
 
+    private fun norm2(s: String) = norm(s)
+
+    /** Musique Spotify jouée par l'enceinte du robot : playlists de la bibliothèque, titres likés, recherche. */
+    private fun spotify(input: Map<String, Any?>): Any {
+        if (!app.prefs.spotifyEnabled) return mapOf("error" to "Spotify est désactivé dans les réglages")
+        SpotifyService.start(c)
+        val q = input.str("query").orEmpty()
+        val shuffle = input["shuffle"] == true
+        when (input.str("action")) {
+            "list_playlists" -> return mapOf("playlists" to (SpotifyApi.playlists() ?: return mapOf("error" to "enceinte Spotify non reliée au compte")).map { it.name })
+            "play_liked" -> {
+                SpotifyApi.shuffle(shuffle)
+                return mapOf("ok" to SpotifyApi.play(SpotifyApi.LIKED), "playing" to "titres likés")
+            }
+            "play_playlist" -> {
+                val lists = SpotifyApi.playlists() ?: return mapOf("error" to "enceinte Spotify non reliée au compte")
+                val n = norm2(q)
+                val hit = lists.firstOrNull { norm2(it.name) == n } ?: lists.firstOrNull { norm2(it.name).contains(n) || (n.isNotEmpty() && n.contains(norm2(it.name))) }
+                if (hit != null) {
+                    SpotifyApi.shuffle(shuffle)
+                    return mapOf("ok" to SpotifyApi.play(hit.uri), "playing" to hit.name, "source" to "bibliothèque")
+                }
+                val r = SpotifyApi.search(c, q) ?: return mapOf("error" to "playlist introuvable", "playlists" to lists.map { it.name })
+                val p = r.playlists.firstOrNull() ?: return mapOf("error" to "playlist introuvable", "playlists" to lists.map { it.name })
+                SpotifyApi.shuffle(shuffle)
+                return mapOf("ok" to SpotifyApi.play(p.uri), "playing" to p.name, "source" to "recherche Spotify")
+            }
+            "play" -> {
+                val r = SpotifyApi.search(c, q) ?: return mapOf("error" to "recherche Spotify impossible")
+                val kind = input.str("kind").orEmpty()
+                val pick = when (kind) {
+                    "artist" -> r.artists.firstOrNull()
+                    "album" -> r.albums.firstOrNull()
+                    "playlist" -> r.playlists.firstOrNull()
+                    else -> r.tracks.firstOrNull()
+                } ?: r.tracks.firstOrNull() ?: return mapOf("error" to "rien trouvé pour « $q »")
+                SpotifyApi.shuffle(shuffle)
+                return mapOf("ok" to SpotifyApi.play(pick.uri), "playing" to pick.name, "by" to pick.sub, "type" to pick.kind)
+            }
+        }
+        return mapOf("error" to "action inconnue")
+    }
+
     private fun media(action: String): Any {
         val a = when (action) {
             "play" -> MediaRemote.Action.PLAY
@@ -285,7 +333,7 @@ internal class Tools(private val c: Context) {
             tool("open_recipe", "Ouvre une recette à l'écran du robot (la personne lance ensuite la cuisson elle-même).", mapOf("id" to p("string", "id de la recette")), listOf("id")),
             tool("open_screen", "Ouvre un écran de l'appli du robot : accueil, retour, recettes, favoris, recettes Thermomix, recherche Cookidoo, liste de courses, minuteurs, cuisson manuelle, programmes, balance, médias, Spotify, réglages, ou la cuisson guidée de la recette affichée.", mapOf(
                 "screen" to p("string", "écran", mapOf("enum" to listOf("home", "back", "recipes", "favorites", "thermomix_recipes", "cookidoo_search",
-                    "shopping_list", "timers", "manual_cooking", "programs", "scale", "media", "spotify", "settings", "guided_cooking"))),
+                    "shopping_list", "timers", "manual_cooking", "programs", "scale", "media", "spotify", "spotify_library", "settings", "guided_cooking"))),
                 "query" to p("string", "texte de recherche (cookidoo_search)"),
             ), listOf("screen")),
             tool("open_app", "Ouvre une autre application installée sur le robot (NewPipe, Legimi, Play Store, navigateur…), par son nom. Sans nom : liste des applis.", mapOf(
@@ -294,6 +342,12 @@ internal class Tools(private val c: Context) {
             tool("list_apps", "Liste les applications installées qu'on peut ouvrir.", mapOf()),
             tool("cook_step", "En cuisson guidée : passe à l'étape suivante ou revient à la précédente (n'exécute rien sur la machine).", mapOf(
                 "action" to p("string", "next ou previous", mapOf("enum" to listOf("next", "previous"))),
+            ), listOf("action")),
+            tool("spotify", "Joue de la musique Spotify sur le robot : une playlist de la bibliothèque (par son nom), les titres likés, ou n'importe quel titre, artiste, album ou playlist du catalogue. Pour mettre en pause, passer ou changer le volume, utilise media.", mapOf(
+                "action" to p("string", "play (recherche catalogue), play_playlist, play_liked ou list_playlists", mapOf("enum" to listOf("play", "play_playlist", "play_liked", "list_playlists"))),
+                "query" to p("string", "titre, artiste, album ou nom de playlist"),
+                "kind" to p("string", "pour play : track, artist, album ou playlist", mapOf("enum" to listOf("track", "artist", "album", "playlist"))),
+                "shuffle" to p("boolean", "lecture aléatoire"),
             ), listOf("action")),
             tool("start_timer", "Lance un minuteur de cuisine.", mapOf(
                 "name" to p("string", "nom, ex. « Pâtes »"), "minutes" to p("number", "minutes"), "seconds" to p("number", "secondes en plus"),

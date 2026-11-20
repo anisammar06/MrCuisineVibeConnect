@@ -30,6 +30,7 @@ class SpotifyScreen(a: MainActivity) : Screen(a) {
     private lateinit var times: TextView
     private lateinit var controls: LinearLayout
     private lateinit var playBtn: LinearLayout
+    private lateinit var library: View
     private lateinit var pairBox: LinearLayout
     private lateinit var pairCode: TextView
     private lateinit var pairQr: ImageView
@@ -72,6 +73,8 @@ class SpotifyScreen(a: MainActivity) : Screen(a) {
         controls.addView(Ui.button(c, "", Ui.Style.SECONDARY, Icon.Kind.CHEVRON, height = 72) { act { SpotifyApi.next() } }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 18))
         controls.addView(Ui.button(c, "", Ui.Style.SECONDARY, Icon.Kind.PLUS, height = 64) { act { SpotifyApi.volume(10) } })
         col.addView(controls, Ui.lp(t = 22))
+        library = Ui.button(c, tr("Ma musique"), Ui.Style.SECONDARY, Icon.Kind.SEARCH, height = 60) { a.push(SpotifyLibraryScreen(a)) }
+        col.addView(library, Ui.lp(Ui.WRAP, Ui.WRAP, t = 18))
 
         pairBox = Ui.horizontal(c)
         pairQr = ImageView(c)
@@ -110,6 +113,7 @@ class SpotifyScreen(a: MainActivity) : Screen(a) {
             }
         }
         controls.visibility = if (s?.active == true) View.VISIBLE else View.GONE
+        library.visibility = controls.visibility
         when {
             !a.prefs.spotifyEnabled -> {
                 name.text = tr("Spotify désactivé")
@@ -124,7 +128,7 @@ class SpotifyScreen(a: MainActivity) : Screen(a) {
             t == null -> {
                 name.text = tr("Prêt à jouer")
                 artist.text = a.prefs.spotifyName
-                info.text = tr("Dans l'appli Spotify du téléphone, touchez l'icône des appareils et choisissez « %s ». Le son sort du robot.", a.prefs.spotifyName)
+                info.text = tr("Choisissez votre musique avec « Ma musique », ou dans l'appli Spotify du téléphone : touchez l'icône des appareils et choisissez « %s ».", a.prefs.spotifyName)
             }
             else -> {
                 name.text = t.name

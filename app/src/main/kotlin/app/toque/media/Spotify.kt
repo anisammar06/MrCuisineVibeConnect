@@ -91,6 +91,9 @@ class SpotifyService : Service() {
             |  address: 127.0.0.1
             |  port: $API_PORT
             |  image_size: large
+            |metadata:
+            |  enabled: true
+            |  max_tracks: 500
             |""".trimMargin(),
         )
     }
@@ -205,11 +208,22 @@ object SpotifyApi {
                  val track: Track?, val context: String)
     class Pairing(val url: String, val code: String)
 
-    private fun call(method: String, path: String, body: String? = null): Pair<Int, String> {
+    /** Élément de bibliothèque ou de recherche : playlist, album, artiste ou titre. */
+    class Item(val uri: String, val name: String, val sub: String, val image: String?) {
+        val kind: String get() = uri.split(':').getOrNull(1).orEmpty()
+    }
+
+    class Tracks(val ready: Boolean, val complete: Boolean, val items: List<Item>)
+
+    class Results(val tracks: List<Item>, val artists: List<Item>, val albums: List<Item>, val playlists: List<Item>)
+
+    const val LIKED = "spotify:collection:tracks"
+
+    private fun call(method: String, path: String, body: String? = null, timeoutMs: Int = 4000): Pair<Int, String> {
         val c = URL("http://127.0.0.1:${SpotifyService.API_PORT}$path").openConnection() as HttpURLConnection
         try {
             c.connectTimeout = 1500
-            c.readTimeout = 4000
+            c.readTimeout = timeoutMs
             c.requestMethod = method
             if (body != null) {
                 c.doOutput = true
@@ -251,6 +265,90 @@ object SpotifyApi {
         if (code != 200) null else Json.parse(text).obj().let { Pairing(it.str("url").orEmpty(), it.str("code").orEmpty()) }
     } catch (_: Exception) {
         null
+    }
+
+    private fun names(v: Any?) = v.list().mapNotNull { it as? String }.joinToString(", ")
+
+    private fun page(path: String, sub: (Map<String, Any?>) -> String): List<Item>? = try {
+        val (code, text) = call("GET", path, timeoutMs = 20_000)
+        if (code != 200) null else Json.parse(text).obj()["items"].list().map { it.obj() }.map {
+            Item(it.str("uri").orEmpty(), it.str("name").orEmpty(), sub(it), it.str("image_url"))
+        }
+    } catch (_: Exception) {
+        null
+    }
+
+    /** Playlists de la bibliothèque (null : pas de session). */
+    fun playlists(): List<Item>? = page("/library/playlists?limit=500") { m ->
+        val n = (m["length"] as? Number)?.toInt() ?: 0
+        listOf(m.str("owner_username").orEmpty().let { if (it == "spotify") "Spotify" else it }, if (n > 0) "$n titres" else "")
+            .filter { it.isNotBlank() }.joinToString(" · ")
+    }
+
+    fun albums(): List<Item>? = page("/library/albums?limit=500") { m ->
+        listOf(names(m["artist_names"]), (m["year"] as? Number)?.toInt()?.takeIf { it > 0 }?.toString().orEmpty()).filter { it.isNotBlank() }.joinToString(" · ")
+    }
+
+    fun artists(): List<Item>? = page("/library/artists?limit=500") { "" }
+
+    /** Titres d'une playlist, d'un album, d'un artiste ou des titres likés (rempli en arrière-plan). */
+    fun tracks(uri: String): Tracks? = try {
+        val (code, text) = call("GET", "/context/tracks?uri=" + java.net.URLEncoder.encode(uri, "UTF-8"), timeoutMs = 10_000)
+        if (code != 200) null else {
+            val m = Json.parse(text).obj()
+            val items = m["tracks"].list().map { it.obj() }.map { e ->
+                val t = e["track"]?.obj()?.takeIf { it.isNotEmpty() }
+                Item(e.str("uri").orEmpty(), t?.str("name") ?: "…", t?.let { names(it["artist_names"]) }.orEmpty(), t?.str("album_cover_url"))
+            }
+            Tracks(m.bool("ready") ?: false, (m.int("cached") ?: 0) >= (m.int("length") ?: 0), items)
+        }
+    } catch (_: Exception) {
+        null
+    }
+
+    /** Lance une playlist / un album / un artiste / un titre, éventuellement à partir d'un titre précis. */
+    fun play(uri: String, skipTo: String? = null): Boolean = post("/player/play", Json.write(linkedMapOf<String, Any?>("uri" to uri).apply {
+        if (!skipTo.isNullOrBlank()) put("skip_to_uri", skipTo)
+    }))
+
+    fun shuffle(on: Boolean) = post("/player/shuffle_context", """{"shuffle_context":$on}""")
+
+    private fun token(): String? = try {
+        val (code, text) = call("POST", "/token")
+        if (code != 200) null else Json.parse(text).obj().str("token")?.takeIf { it.isNotBlank() }
+    } catch (_: Exception) {
+        null
+    }
+
+    /** Recherche dans tout le catalogue Spotify (API Web, avec la session de l'enceinte). */
+    fun search(c: android.content.Context, q: String, limit: Int = 10): Results? {
+        val tok = token() ?: return null
+        val url = "https://api.spotify.com/v1/search?type=track,artist,album,playlist&market=from_token&limit=$limit&q=" +
+            java.net.URLEncoder.encode(q, "UTF-8")
+        val conn = URL(url).openConnection() as javax.net.ssl.HttpsURLConnection
+        return try {
+            conn.sslSocketFactory = app.toque.recipes.CookidooClient.sslFactory(c)
+            conn.connectTimeout = 8000
+            conn.readTimeout = 10_000
+            conn.setRequestProperty("Authorization", "Bearer $tok")
+            if (conn.responseCode != 200) return null
+            val m = Json.parse(conn.inputStream.bufferedReader().readText()).obj()
+            fun img(o: Map<String, Any?>) = o["images"].list().firstOrNull()?.obj()?.str("url")
+            fun list(key: String, f: (Map<String, Any?>) -> Item) = m[key]?.obj()?.get("items").list().mapNotNull { it as? Map<*, *> }
+                .map { @Suppress("UNCHECKED_CAST") (it as Map<String, Any?>) }.map(f)
+            Results(
+                list("tracks") { t -> Item(t.str("uri").orEmpty(), t.str("name").orEmpty(),
+                    t["artists"].list().mapNotNull { (it as? Map<*, *>)?.get("name") as? String }.joinToString(", "), t["album"]?.obj()?.let { img(it) }) },
+                list("artists") { t -> Item(t.str("uri").orEmpty(), t.str("name").orEmpty(), "", img(t)) },
+                list("albums") { t -> Item(t.str("uri").orEmpty(), t.str("name").orEmpty(),
+                    t["artists"].list().mapNotNull { (it as? Map<*, *>)?.get("name") as? String }.joinToString(", "), img(t)) },
+                list("playlists") { t -> Item(t.str("uri").orEmpty(), t.str("name").orEmpty(), t["owner"]?.obj()?.str("display_name").orEmpty(), img(t)) },
+            )
+        } catch (_: Exception) {
+            null
+        } finally {
+            conn.disconnect()
+        }
     }
 
     fun playPause() = post("/player/playpause")
