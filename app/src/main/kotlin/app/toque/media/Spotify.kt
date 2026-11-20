@@ -320,9 +320,47 @@ object SpotifyApi {
         null
     }
 
-    /** Recherche dans tout le catalogue Spotify (API Web, avec la session de l'enceinte). */
+    private var appToken: String? = null
+    private var appTokenUntil = 0L
+
+    /**
+     * Jeton de l'appli développeur de l'utilisateur (identifiants client) : la recherche avec le jeton
+     * de l'enceinte est presque toujours refusée par Spotify (quota partagé, erreur 429).
+     */
+    @Synchronized
+    private fun appToken(c: android.content.Context): String? {
+        val p = Prefs(c)
+        if (p.spotifyClientId.isBlank() || p.spotifyClientSecret.isBlank()) return null
+        if (appToken != null && System.currentTimeMillis() < appTokenUntil) return appToken
+        val conn = URL("https://accounts.spotify.com/api/token").openConnection() as javax.net.ssl.HttpsURLConnection
+        return try {
+            conn.sslSocketFactory = app.toque.recipes.CookidooClient.sslFactory(c)
+            conn.connectTimeout = 8000
+            conn.readTimeout = 10_000
+            conn.requestMethod = "POST"
+            conn.doOutput = true
+            val basic = android.util.Base64.encodeToString("${p.spotifyClientId.trim()}:${p.spotifyClientSecret.trim()}".toByteArray(), android.util.Base64.NO_WRAP)
+            conn.setRequestProperty("Authorization", "Basic $basic")
+            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+            conn.outputStream.use { it.write("grant_type=client_credentials".toByteArray()) }
+            if (conn.responseCode != 200) return null
+            val m = Json.parse(conn.inputStream.bufferedReader().readText()).obj()
+            appToken = m.str("access_token")
+            appTokenUntil = System.currentTimeMillis() + ((m.int("expires_in") ?: 3600) - 120) * 1000L
+            appToken
+        } catch (_: Exception) {
+            null
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** Vrai si la recherche a ses identifiants (appli développeur Spotify). */
+    fun canSearch(c: android.content.Context) = Prefs(c).let { it.spotifyClientId.isNotBlank() && it.spotifyClientSecret.isNotBlank() }
+
+    /** Recherche dans tout le catalogue Spotify (API Web). */
     fun search(c: android.content.Context, q: String, limit: Int = 10): Results? {
-        val tok = token() ?: return null
+        val tok = appToken(c) ?: token() ?: return null
         val url = "https://api.spotify.com/v1/search?type=track,artist,album,playlist&market=from_token&limit=$limit&q=" +
             java.net.URLEncoder.encode(q, "UTF-8")
         val conn = URL(url).openConnection() as javax.net.ssl.HttpsURLConnection

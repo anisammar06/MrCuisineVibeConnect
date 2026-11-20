@@ -304,6 +304,10 @@ class ReceiverService : Service() {
                 }
                 val ant = m.str("anthropic").orEmpty().trim()
                 val oai = m.str("openai").orEmpty().trim()
+                val sid = m.str("spotify_id").orEmpty().trim()
+                val ssec = m.str("spotify_secret").orEmpty().trim()
+                if (sid.length >= 20) prefs.spotifyClientId = sid
+                if (ssec.length >= 20) prefs.spotifyClientSecret = ssec
                 if (ant.startsWith("sk-ant-")) prefs.anthropicKey = ant
                 if (oai.startsWith("sk-")) prefs.openaiKey = oai
                 if (ant.isNotEmpty() || oai.isNotEmpty()) {
@@ -320,6 +324,7 @@ class ReceiverService : Service() {
     private fun assistantStatus(): String = Json.write(linkedMapOf(
         "anthropic" to prefs.anthropicKey.isNotBlank(), "openai" to prefs.openaiKey.isNotBlank(),
         "voice" to prefs.voiceEnabled, "enabled" to prefs.assistantEnabled,
+        "spotify" to (prefs.spotifyClientId.isNotBlank() && prefs.spotifyClientSecret.isNotBlank()),
     ))
 
     private fun itemsJson(): String = Json.write(app.toque.kitchen.Shopping.get(this).items.map {
@@ -382,18 +387,23 @@ a{color:#f0a040}
 <label>Clé OpenAI (voix) — commence par sk-</label>
 <input id="o" type="password" autocomplete="off" placeholder="sk-…">
 <p style="font-size:14px">À créer sur <a href="https://platform.openai.com/api-keys">platform.openai.com</a></p>
+<label>Spotify — Client ID (recherche dans Spotify, facultatif)</label>
+<input id="si" type="password" autocomplete="off" placeholder="Client ID">
+<label>Spotify — Client secret</label>
+<input id="ss" type="password" autocomplete="off" placeholder="Client secret">
+<p style="font-size:14px">Sur <a href="https://developer.spotify.com/dashboard">developer.spotify.com</a> (compte Premium) : Create app, nom libre, Redirect URI <code>http://127.0.0.1:8888/callback</code>, cochez « Web API », puis copiez Client ID et Client secret.</p>
 <button id="b">Enregistrer sur le robot</button>
 <div class="st" id="s">…</div>
 <script>
 var k=new URLSearchParams(location.search).get('k');
-function show(j){document.getElementById('s').innerHTML='Clé Anthropic : '+(j.anthropic?'✅ enregistrée':'❌ manquante')+'<br>Clé OpenAI : '+(j.openai?'✅ enregistrée':'❌ manquante')+(j.voice?'':'<br>⚠️ Activez la commande vocale dans les réglages du robot.');}
+function show(j){document.getElementById('s').innerHTML='Clé Anthropic : '+(j.anthropic?'✅ enregistrée':'❌ manquante')+'<br>Clé OpenAI : '+(j.openai?'✅ enregistrée':'❌ manquante')+'<br>Recherche Spotify : '+(j.spotify?'✅ configurée':'— non configurée')+(j.voice?'':'<br>⚠️ Activez la commande vocale dans les réglages du robot.');}
 fetch('/assistant/status?k='+k).then(function(r){return r.json()}).then(show);
 document.getElementById('b').onclick=function(){
- var a=document.getElementById('a').value.trim(),o=document.getElementById('o').value.trim();
+ var a=document.getElementById('a').value.trim(),o=document.getElementById('o').value.trim(),si=document.getElementById('si').value.trim(),ss=document.getElementById('ss').value.trim();
  if(a&&a.indexOf('sk-ant-')!==0){alert('La clé Anthropic doit commencer par sk-ant-');return}
  if(o&&o.indexOf('sk-')!==0){alert('La clé OpenAI doit commencer par sk-');return}
- fetch('/assistant/keys?k='+k,{method:'POST',body:JSON.stringify({anthropic:a,openai:o})}).then(function(r){return r.json()}).then(function(j){
-  document.getElementById('a').value='';document.getElementById('o').value='';show(j);});
+ fetch('/assistant/keys?k='+k,{method:'POST',body:JSON.stringify({anthropic:a,openai:o,spotify_id:si,spotify_secret:ss})}).then(function(r){return r.json()}).then(function(j){
+  ['a','o','si','ss'].forEach(function(x){document.getElementById(x).value=''});show(j);});
 };
 </script></body></html>"""
 

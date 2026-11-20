@@ -384,6 +384,19 @@ class Prefs(context: Context) {
             p.edit().putInt("assistantSpeed", v).commit()
         }
 
+    /** Appli développeur Spotify de l'utilisateur, pour la recherche dans le catalogue. */
+    var spotifyClientId: String
+        get() = p.getString("spotifyClientId", "") ?: ""
+        set(v) {
+            p.edit().putString("spotifyClientId", v).commit()
+        }
+
+    var spotifyClientSecret: String
+        get() = p.getString("spotifyClientSecret", "") ?: ""
+        set(v) {
+            p.edit().putString("spotifyClientSecret", v).commit()
+        }
+
     /** Ville pour la météo et les recherches locales de l'assistant. */
     var assistantCity: String
         get() = p.getString("assistantCity", "") ?: ""

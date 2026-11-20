@@ -663,5 +663,6 @@
   "Titres": "Tracks",
   "Recherche": "Search",
   "Titre, artiste, album, playlist…": "Track, artist, album, playlist…",
-  "Tout lire": "Play all"
+  "Tout lire": "Play all",
+  "Pour chercher dans tout Spotify, ajoutez les identifiants de votre appli Spotify depuis le téléphone (Réglages › Assistant, code QR).": "To search all of Spotify, add your Spotify app credentials from your phone (Settings › Assistant, QR code)."
 }

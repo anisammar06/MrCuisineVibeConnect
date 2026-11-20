@@ -132,7 +132,11 @@ class SpotifyLibraryScreen(a: MainActivity) : Screen(a) {
         list.removeAllViews()
         val gen = ++generation
         when (tab) {
-            Tab.SEARCH -> { status.text = tr("Cherchez dans tout Spotify."); return }
+            Tab.SEARCH -> {
+                status.text = if (SpotifyApi.canSearch(c)) tr("Cherchez dans tout Spotify.")
+                else tr("Pour chercher dans tout Spotify, ajoutez les identifiants de votre appli Spotify depuis le téléphone (Réglages › Assistant, code QR).")
+                return
+            }
             Tab.LIKED -> { a.push(SpotifyTracksScreen(a, SpotifyApi.LIKED, tr("Titres likés"))); tab = Tab.PLAYLISTS; renderTabs(); load(); return }
             else -> Unit
         }
