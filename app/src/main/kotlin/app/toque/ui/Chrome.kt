@@ -40,6 +40,8 @@ class TopBar(private val a: MainActivity) : LinearLayout(a) {
     private val titleView = Ui.ellipsize(Ui.text(a, "", 24f, Ui.TEXT, Ui.MEDIUM))
     private val temp = Ui.chip(a, "", Icon.Kind.THERMO, Ui.TEXT2)
     private val lid = Ui.chip(a, tr("Couvercle ouvert"), Icon.Kind.LID, Ui.WARN, 0x33FFC14D)
+    /** Bol non détecté alors que la sécurité l'exige : la machine refusera de démarrer. */
+    private val bowl = Ui.chip(a, tr("Bol non détecté"), Icon.Kind.POT, Ui.WARN, 0x33FFC14D)
     private val link = Ui.chip(a, "", Icon.Kind.LINK, Ui.TEXT2)
     private val clock = Ui.text(a, "", 22f, Ui.TEXT, Ui.LIGHT)
     private val home = Icon(a, Icon.Kind.HOME, Ui.TEXT2)
@@ -68,6 +70,7 @@ class TopBar(private val a: MainActivity) : LinearLayout(a) {
         addView(titleView, LayoutParams(0, Ui.WRAP, 1f).apply { leftMargin = Ui.u(6) })
         addView(timers, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
         addView(lid, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
+        addView(bowl, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
         addView(temp, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
         addView(link, Ui.lp(Ui.WRAP, Ui.WRAP, r = 16))
         addView(clock, Ui.lp(Ui.WRAP, Ui.WRAP, r = 6))
@@ -76,6 +79,7 @@ class TopBar(private val a: MainActivity) : LinearLayout(a) {
         home.setOnClickListener { a.home() }
         addView(home, LayoutParams(Ui.u(52), Ui.u(52)))
         lid.visibility = View.GONE
+        bowl.visibility = View.GONE
         temp.visibility = View.GONE
         // Accès caché aux réglages Android : 5 appuis rapides sur l'heure.
         clock.setOnClickListener {
@@ -128,7 +132,8 @@ class TopBar(private val a: MainActivity) : LinearLayout(a) {
 
     fun update(s: Snapshot) {
         lid.visibility = if (s.hasSample && s.lidOpen) View.VISIBLE else View.GONE
-        if (s.hasSample) {
+        bowl.visibility = if (s.hasSample && !s.bowlDetected && a.prefs.requireBowl) View.VISIBLE else View.GONE
+        if (s.hasSample && s.bowlDetected) {
             temp.visibility = View.VISIBLE
             Ui.chipText(temp).text = "${s.actualTempC} °C"
             val col = if (s.actualTempC >= 40) Ui.tempColor(s.actualTempC) else Ui.TEXT2

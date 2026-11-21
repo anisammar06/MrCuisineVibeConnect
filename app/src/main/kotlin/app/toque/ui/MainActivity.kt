@@ -174,6 +174,8 @@ class MainActivity : Activity() {
                 if (want) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
+            // La barre de navigation d'Android réapparaît parfois (clavier, autre appli) : on la recache.
+            if (window.decorView.systemUiVisibility and View.SYSTEM_UI_FLAG_HIDE_NAVIGATION == 0 && currentFocus !is android.widget.EditText) immersive()
             root.postDelayed(this, 3000)
         }
     }
