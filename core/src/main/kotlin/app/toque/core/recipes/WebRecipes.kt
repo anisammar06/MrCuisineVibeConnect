@@ -110,7 +110,8 @@ object WebRecipes {
         val endIng = html.indexOf("</ul>", html.lastIndexOf("ingredient-name").coerceAtLeast(0)).coerceAtLeast(0)
         var body = html.substring(endIng)
         val stop = listOf("recipe_end_ad", "post-footer", "post-categories", "comments-root").map { body.indexOf(it) }.filter { it > 0 }.minOrNull()
-        if (stop != null) body = body.substring(0, stop)
+        // On coupe avant la balise qui contient le marqueur de fin (sinon un bout de balise devient une étape).
+        if (stop != null) body = body.substring(0, body.lastIndexOf('<', stop).takeIf { it >= 0 } ?: stop)
         val h3 = body.indexOf("<h3")
         if (h3 >= 0) body = body.substring(h3)
         body = body.replace(Regex("<ins[^>]*>.*?</ins>", RegexOption.DOT_MATCHES_ALL), "")

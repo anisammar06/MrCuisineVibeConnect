@@ -23,6 +23,7 @@ class HomeScreen(a: MainActivity) : Screen(a) {
     private lateinit var favSub: TextView
     private lateinit var shopSub: TextView
     private lateinit var tmSub: TextView
+    private var webSub: TextView? = null
     private lateinit var timerSub: TextView
     private lateinit var resumeCard: LinearLayout
     private lateinit var resumeText: TextView
