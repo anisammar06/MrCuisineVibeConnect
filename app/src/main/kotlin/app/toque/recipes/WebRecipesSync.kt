@@ -122,7 +122,8 @@ object WebRecipesSync {
                     batch += p.recipe
                     added++
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (failed < 3) app.log.write("recettes-web", "${site.label} : $u → $e")
                 failed++
             }
             // Enregistrées par petits paquets : elles apparaissent dans la liste pendant le téléchargement.
@@ -141,8 +142,11 @@ object WebRecipesSync {
                 var page = 0
                 while (!stopRequested && page < 600) {
                     if (perSite > 0 && added + failed >= perSite) { left = 1; break }
+                    show(site, "${site.label} : liste, page ${page + 1} (+$added)")
+                    val t0 = System.currentTimeMillis()
                     val html = get(c, "${site.base}/przepisy" + if (page > 0) "?page=$page" else "")
                     val found = WebRecipes.kwestiaUrls(html)
+                    if (page < 2) app.log.write("recettes-web", "Kwestia page ${page + 1} : ${found.size} recettes, ${html.length} car., ${System.currentTimeMillis() - t0} ms")
                     if (found.isEmpty()) break
                     sleep(delay)
                     for (u in missing(found)) if (!fetch(u)) { left = 1; break }
@@ -151,6 +155,7 @@ object WebRecipesSync {
                 }
             }
         } catch (e: Exception) {
+            app.log.write("recettes-web", "${site.label} : erreur $e")
             if (batch.isNotEmpty()) repo.upsertAll(batch)
             return "${site.label} : +$added, interrompu (${e.message})"
         }
@@ -208,12 +213,17 @@ object WebRecipesSync {
         return conn
     }
 
+    private val watchdog = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
+
     private fun get(c: Context, url: String): String {
         val conn = open(c, url)
+        // Garde-fou : une page qui ne finit jamais d'arriver est coupée au bout de 60 s.
+        val guard = watchdog.schedule({ try { conn.disconnect() } catch (_: Exception) {} }, 60, java.util.concurrent.TimeUnit.SECONDS)
         try {
             if (conn.responseCode != 200) throw IOException("HTTP ${conn.responseCode}")
             return conn.inputStream.use { String(it.readBytes(), Charsets.UTF_8) }
         } finally {
+            guard.cancel(false)
             conn.disconnect()
         }
     }

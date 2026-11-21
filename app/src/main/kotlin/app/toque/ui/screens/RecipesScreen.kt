@@ -217,7 +217,7 @@ class RecipesScreen(
         val none = repo.loaded && repo.count == 0
         count.text = if (results.isEmpty()) "" else if (results.size == 1) tr("1 recette") else tr("%d recettes", results.size)
         empty.visibility = if (results.isEmpty() && repo.loaded) View.VISIBLE else View.GONE
-        if (web && WebProgress.running && results.isEmpty()) count.text = WebProgress.text
+        if (web && WebProgress.running && results.isEmpty()) count.text = tr("Téléchargement…")
         emptyText.text = when {
             none && web -> if (WebProgress.running) tr("Téléchargement en cours : %s", WebProgress.text)
                 else tr("Les recettes de ce site ne sont pas encore sur le robot.\nTouchez « Télécharger » : elles arrivent peu à peu (une toutes les 2 à 10 secondes, pour ménager le site).")

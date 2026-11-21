@@ -681,10 +681,12 @@
   "Przepisy – recettes polonaises": "Przepisy – Polish recipes",
   "Téléchargement arrêté": "Download stopped",
   "Cookidoo · %d FR · %d PL": "Cookidoo · %d FR · %d PL",
-  "Ania Gotuje %d · Kwestia Smaku %d": "Ania Gotuje %d · Kwestia Smaku %d",
-  "Recettes Lidl · %d FR · %d PL": "Lidl recipes · %d FR · %d PL",
   "Recettes polonaises": "Polish recipes",
   "Recettes Monsieur Cuisine": "Monsieur Cuisine recipes",
   "Recette abandonnée": "Recipe cancelled",
-  "Monsieur Cuisine": "Monsieur Cuisine"
+  "Monsieur Cuisine": "Monsieur Cuisine",
+  "Ania %d · Kwestia %d": "Ania %d · Kwestia %d",
+  "Lidl · %d FR · %d PL": "Lidl · %d FR · %d PL",
+  "Téléchargement… Ania %d · Kwestia %d": "Downloading… Ania %d · Kwestia %d",
+  "Téléchargement…": "Downloading…"
 }

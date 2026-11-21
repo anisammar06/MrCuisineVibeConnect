@@ -156,7 +156,7 @@ class HomeScreen(a: MainActivity) : Screen(a) {
             SyncProgress.running -> SyncProgress.text
             !repo.loaded -> tr("Chargement…")
             n == 0 -> tr("Aucune recette Lidl pour l'instant")
-            a.app.recipesPl.count > 0 -> tr("Recettes Lidl · %d FR · %d PL", a.app.recipesFr.count, a.app.recipesPl.count)
+            a.app.recipesPl.count > 0 -> tr("Lidl · %d FR · %d PL", a.app.recipesFr.count, a.app.recipesPl.count)
             else -> tr("%d recettes Lidl", n)
         }
         val favs = repo.index.entries.count { it.favorite }
@@ -172,8 +172,8 @@ class HomeScreen(a: MainActivity) : Screen(a) {
         val wa = a.app.webAnia.count
         val wk = a.app.webKwestia.count
         webSub?.text = when {
-            app.toque.recipes.WebProgress.running -> app.toque.recipes.WebProgress.text
-            wa + wk > 0 -> tr("Ania Gotuje %d · Kwestia Smaku %d", wa, wk)
+            app.toque.recipes.WebProgress.running -> tr("Téléchargement… Ania %d · Kwestia %d", wa, wk)
+            wa + wk > 0 -> tr("Ania %d · Kwestia %d", wa, wk)
             else -> tr("Ania Gotuje, Kwestia Smaku")
         }
         val shop = app.toque.kitchen.Shopping.get(c).remaining
