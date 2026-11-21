@@ -268,7 +268,11 @@ class CookidooClient(private val context: Context) {
          * Chaîne serveur → racine embarquée : chaque signature, dates de validité, droits d'autorité (CA, keyCertSign)
          * des émetteurs, usage serveur de la feuille. Vrai seulement si la chaîne aboutit à une racine de [anchors].
          */
+        /** Dernier refus de [strictCheck] (diagnostic pour le journal). */
+        @Volatile var lastTrustIssue: String = ""
+
         internal fun strictCheck(chain: Array<X509Certificate>, anchors: Array<X509Certificate>): Boolean = try {
+            lastTrustIssue = "chaîne " + chain.joinToString(" ← ") { it.subjectX500Principal.name.substringAfter("CN=").substringBefore(',') + "/" + it.sigAlgName }
             if (chain.isEmpty()) false else {
                 val leaf = chain[0]
                 leaf.checkValidity()
@@ -282,6 +286,9 @@ class CookidooClient(private val context: Context) {
                         a.subjectX500Principal == cur.issuerX500Principal && runCatching { cur.verify(a.publicKey) }.isSuccess
                     }
                     if (anchor != null) { anchor.checkValidity(); ok = true; break }
+                    val sameName = (chain.drop(1) + anchors).filter { it.subjectX500Principal == cur.issuerX500Principal }
+                    lastTrustIssue += " | émetteur de ${cur.subjectX500Principal.name.substringAfter("CN=").substringBefore(',')} : ${sameName.size} candidats" +
+                        sameName.joinToString("") { c -> " [" + (runCatching { cur.verify(c.publicKey); "ok" }.exceptionOrNull()?.toString()?.take(120) ?: "ok") + "]" }
                     val issuer = chain.drop(1).firstOrNull { i ->
                         i.subjectX500Principal == cur.issuerX500Principal && runCatching { cur.verify(i.publicKey) }.isSuccess
                     } ?: break
@@ -293,7 +300,8 @@ class CookidooClient(private val context: Context) {
                 }
                 ok
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            lastTrustIssue += " | $e"
             false
         }
 
