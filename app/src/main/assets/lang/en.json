@@ -550,7 +550,6 @@
   "Délier le compte Spotify ?": "Unlink the Spotify account?",
   "Spotify désactivé": "Spotify turned off",
   "Ouvrir Spotify": "Open Spotify",
-  "Prêt à jouer": "Ready to play",
   "Démarrage de Spotify…": "Starting Spotify…",
   "Il faudra refaire l'appairage avec un code.": "You will have to pair again with a code.",
   "Spotify": "Spotify",
@@ -561,7 +560,6 @@
   "Compte Spotify délié": "Spotify account unlinked",
   "Le robot apparaît comme enceinte « %s » dans l'appli Spotify (compte Premium). Premier appairage : Médias › Spotify.": "The robot shows up as the “%s” speaker in the Spotify app (Premium account). First pairing: Media › Spotify.",
   "Première fois : scannez le code avec le téléphone, ou allez sur spotify.com/pair et saisissez :": "First time: scan the code with the phone, or go to spotify.com/pair and enter:",
-  "Volume %d %%": "Volume %d %%",
   "Signal constant (pic %d %%, moyenne %d) : probablement pas de vrai micro.": "Constant signal (peak %d %%, average %d): probably no real microphone.",
   "Micro inaccessible : %s": "Microphone unavailable: %s",
   "Écoute… parlez maintenant.": "Listening… speak now.",
@@ -652,7 +650,6 @@
   "%d titres": "%d tracks",
   "Albums": "Albums",
   "Lecture impossible": "Cannot play",
-  "Choisissez votre musique avec « Ma musique », ou dans l'appli Spotify du téléphone : touchez l'icône des appareils et choisissez « %s ».": "Pick your music with “My music”, or in the Spotify app on your phone: tap the devices icon and choose “%s”.",
   "Spotify ne répond pas : l'enceinte doit être reliée à votre compte (écran Spotify).": "Spotify is not answering: the speaker must be linked to your account (Spotify screen).",
   "Recherche impossible pour le moment.": "Search unavailable right now.",
   "Artistes": "Artists",
@@ -667,5 +664,12 @@
   "Exiger la détection du bol (expérimental)": "Require bowl detection (experimental)",
   "Petits commentaires de l'assistant (bonjour, mises en garde, conseils en cuisinant)": "Little comments from the assistant (greetings, warnings, cooking tips)",
   "Pesez librement ; la tare remet à zéro.": "Weigh freely; tare resets to zero.",
-  "Posez le bol sur la base, faites la tare, puis versez.": "Put the bowl on the base, tare, then pour."
+  "Posez le bol sur la base, faites la tare, puis versez.": "Put the bowl on the base, tare, then pour.",
+  "Vos playlists": "Your playlists",
+  "Que souhaitez-vous écouter ?": "What do you want to listen to?",
+  "Rien en lecture": "Nothing playing",
+  "Vos artistes": "Your artists",
+  "Choisissez une playlist ou un album ci-dessus.": "Pick a playlist or an album above.",
+  "Vos albums": "Your albums",
+  "Spotify ne répond pas : l'enceinte doit être reliée à votre compte.": "Spotify is not answering: the speaker must be linked to your account."
 }

@@ -2,6 +2,7 @@ package app.toque.ui
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Handler
@@ -43,10 +44,24 @@ class TopBar(private val a: MainActivity) : LinearLayout(a) {
     /** Bol non détecté alors que la sécurité l'exige : la machine refusera de démarrer. */
     private val bowl = Ui.chip(a, tr("Bol non détecté"), Icon.Kind.POT, Ui.WARN, 0x33FFC14D)
     private val link = Ui.chip(a, "", Icon.Kind.LINK, Ui.TEXT2)
-    private val clock = Ui.text(a, "", 22f, Ui.TEXT, Ui.LIGHT)
+    private val clock = Ui.text(a, "", 21f, Ui.TEXT, Ui.LIGHT)
+    /** Hauteur commune de tous les éléments de la barre. */
+    private val H = Ui.u(44)
+
+    /** Pastille en relief : dégradé vertical (lumière du haut), liseré clair ; teinte d'alerte possible. */
+    private fun pill(v: View, round: Boolean = false, tint: Int = 0) {
+        val top = if (tint != 0) Color.argb(70, Color.red(tint), Color.green(tint), Color.blue(tint)) else 0xFF2A2E36.toInt()
+        val bottom = if (tint != 0) Color.argb(40, Color.red(tint), Color.green(tint), Color.blue(tint)) else 0xFF1A1D22.toInt()
+        val bg = android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(top, bottom)).apply {
+            cornerRadius = Ui.uf(22f)
+            setStroke(Ui.u(1), if (tint != 0) Color.argb(90, Color.red(tint), Color.green(tint), Color.blue(tint)) else 0x24FFFFFF)
+        }
+        v.background = if (round) Ui.pressable(bg, 22f) else bg
+        v.elevation = Ui.uf(3f)
+    }
     private val home = Icon(a, Icon.Kind.HOME, Ui.TEXT2)
     /** Minuteurs de cuisine en cours, visibles sur tous les écrans. */
-    private val timers = Ui.horizontal(a)
+    private val timers = Ui.horizontal(a, Gravity.CENTER_VERTICAL)
     private val tools: LinearLayout
     private val handler = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
@@ -61,43 +76,52 @@ class TopBar(private val a: MainActivity) : LinearLayout(a) {
     init {
         orientation = HORIZONTAL
         setGravity(Gravity.CENTER_VERTICAL)
-        setPadding(Ui.u(10), 0, Ui.u(18), 0)
-        setBackgroundColor(Ui.BG)
+        setPadding(Ui.u(10), 0, Ui.u(14), 0)
+        // Fond de barre : léger dégradé vertical et liseré bas, pour détacher la barre du contenu.
+        background = android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(0xFF16181C.toInt(), Ui.BG))
+        // Tous les éléments ont la même hauteur (H) et le même relief.
+        pill(back, round = true)
         back.setPadding(Ui.u(10), Ui.u(10), Ui.u(10), Ui.u(10))
-        back.background = Ui.pressable(Ui.round(0, 30f), 30f)
-        // Sur l'accueil, le même bouton devient l'engrenage des Réglages (angle haut gauche).
         back.setOnClickListener { if (a.depth > 1) a.back() else a.push(app.toque.ui.screens.SettingsScreen(a)) }
-        addView(back, LayoutParams(Ui.u(52), Ui.u(52)))
-        addView(titleView, LayoutParams(0, Ui.WRAP, 1f).apply { leftMargin = Ui.u(6) })
-        // Outils du robot accessibles depuis n'importe quel écran.
+        addView(back, LayoutParams(H, H))
+        addView(titleView, LayoutParams(0, Ui.WRAP, 1f).apply { leftMargin = Ui.u(12) })
+        // Outils du robot accessibles depuis n'importe quel écran, regroupés dans une seule pastille.
         tools = Ui.horizontal(a, Gravity.CENTER_VERTICAL)
-        for ((kind, open) in listOf<Pair<Icon.Kind, () -> Screen>>(
+        pill(tools)
+        tools.setPadding(Ui.u(4), 0, Ui.u(4), 0)
+        val entries = listOf<Pair<Icon.Kind, () -> Screen>>(
             Icon.Kind.SCALE to { app.toque.ui.screens.ScaleScreen(a) },
-            Icon.Kind.CLOCK to { app.toque.ui.screens.TimersScreen(a) },
+            Icon.Kind.TIMER to { app.toque.ui.screens.TimersScreen(a) },
             Icon.Kind.POT to { app.toque.ui.screens.ManualScreen(a) },
             Icon.Kind.CHECK to { app.toque.ui.screens.ShoppingScreen(a) },
             Icon.Kind.PLAY to { app.toque.ui.screens.MediaScreen(a) },
-        )) {
+        )
+        for ((i, e) in entries.withIndex()) {
+            val (kind, open) = e
             val ic = Icon(a, kind, Ui.TEXT2)
-            ic.setPadding(Ui.u(11), Ui.u(11), Ui.u(11), Ui.u(11))
-            ic.background = Ui.pressable(Ui.round(0x14FFFFFF, 26f), 26f)
+            ic.setPadding(Ui.u(9), Ui.u(9), Ui.u(9), Ui.u(9))
+            ic.background = Ui.pressable(Ui.round(0, 20f), 20f)
             ic.setOnClickListener {
-                val s = open()
-                if (a.current?.javaClass != s.javaClass) a.push(s)
+                val sc = open()
+                if (a.current?.javaClass != sc.javaClass) a.push(sc)
             }
-            tools.addView(ic, LayoutParams(Ui.u(48), Ui.u(48)).apply { rightMargin = Ui.u(6) })
+            tools.addView(ic, LayoutParams(H - Ui.u(4), H - Ui.u(4)))
+            if (i < entries.size - 1) tools.addView(View(a).apply { setBackgroundColor(0x1FFFFFFF) }, LayoutParams(Ui.u(1), Ui.u(18)))
         }
-        addView(tools, Ui.lp(Ui.WRAP, Ui.WRAP, r = 12))
-        addView(timers, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
-        addView(lid, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
-        addView(bowl, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
-        addView(temp, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
-        addView(link, Ui.lp(Ui.WRAP, Ui.WRAP, r = 16))
-        addView(clock, Ui.lp(Ui.WRAP, Ui.WRAP, r = 6))
+        addView(tools, LayoutParams(Ui.WRAP, H).apply { rightMargin = Ui.u(10) })
+        for (v in listOf(timers)) addView(v, LayoutParams(Ui.WRAP, H).apply { rightMargin = Ui.u(8) })
+        for (ch in listOf(lid, bowl, temp, link)) {
+            pill(ch, tint = if (ch === lid || ch === bowl) Ui.WARN else 0)
+            ch.setPadding(Ui.u(12), 0, Ui.u(14), 0)
+            addView(ch, LayoutParams(Ui.WRAP, H).apply { rightMargin = Ui.u(8) })
+        }
+        clock.gravity = Gravity.CENTER
+        addView(clock, LayoutParams(Ui.WRAP, H).apply { leftMargin = Ui.u(4); rightMargin = Ui.u(8) })
+        pill(home, round = true)
         home.setPadding(Ui.u(10), Ui.u(10), Ui.u(10), Ui.u(10))
-        home.background = Ui.pressable(Ui.round(0, 30f), 30f)
         home.setOnClickListener { a.home() }
-        addView(home, LayoutParams(Ui.u(52), Ui.u(52)))
+        addView(home, LayoutParams(H, H))
         lid.visibility = View.GONE
         bowl.visibility = View.GONE
         temp.visibility = View.GONE
@@ -142,11 +166,13 @@ class TopBar(private val a: MainActivity) : LinearLayout(a) {
             }
             val label = t.name.take(10) + " " + if (t.finished(now)) "0:00" else app.toque.core.kitchen.TimerBoard.format(t.leftMs(now))
             val chip = Ui.chip(a, label, Icon.Kind.TIMER, color, if (ringing) 0x44FF5252 else Ui.SURFACE2)
+            pill(chip, tint = if (ringing) Ui.DANGER else 0)
+            chip.setPadding(Ui.u(12), 0, Ui.u(14), 0)
             chip.isClickable = true
             chip.setOnClickListener { if (a.current !is app.toque.ui.screens.TimersScreen) a.push(app.toque.ui.screens.TimersScreen(a)) }
-            timers.addView(chip, Ui.lp(Ui.WRAP, Ui.WRAP, r = 8))
+            timers.addView(chip, LayoutParams(Ui.WRAP, H).apply { rightMargin = Ui.u(8) })
         }
-        if (list.size > 2) timers.addView(Ui.chip(a, "+" + (list.size - 2), null, Ui.TEXT2))
+        if (list.size > 2) timers.addView(Ui.chip(a, "+" + (list.size - 2), null, Ui.TEXT2).also { pill(it); it.setPadding(Ui.u(12), 0, Ui.u(12), 0) }, LayoutParams(Ui.WRAP, H))
         timers.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE
     }
 

@@ -19,7 +19,9 @@ import app.toque.ui.HoldButton
 import app.toque.ui.Icon
 import app.toque.ui.MainActivity
 import app.toque.ui.Screen
-import app.toque.ui.TempRing
+import app.toque.ui.ClockArt
+import app.toque.ui.MotorView
+import app.toque.ui.SteamView
 import app.toque.ui.Ui
 import app.toque.ui.ValueCard
 
@@ -42,8 +44,9 @@ class ManualScreen(a: MainActivity, preset: app.toque.core.recipes.StepMachine? 
     private lateinit var speedCard: ValueCard
     private lateinit var dirRow: LinearLayout
     private lateinit var accRow: LinearLayout
-    private lateinit var ring: TempRing
-    private lateinit var weight: TextView
+    private lateinit var clockArt: ClockArt
+    private lateinit var steam: SteamView
+    private lateinit var motor: MotorView
     private lateinit var startBtn: LinearLayout
     private lateinit var hint: TextView
     private lateinit var turbo: HoldButton
@@ -55,48 +58,44 @@ class ManualScreen(a: MainActivity, preset: app.toque.core.recipes.StepMachine? 
     private val pushLive = Runnable { sendAdjust() }
 
     override fun build(): View {
-        val root = Ui.horizontal(c, Gravity.TOP)
-        root.setPadding(Ui.u(24), Ui.u(8), Ui.u(24), Ui.u(20))
-        val left = Ui.vertical(c)
+        val root = Ui.vertical(c)
+        root.setPadding(Ui.u(24), Ui.u(8), Ui.u(24), Ui.u(18))
         val cards = Ui.horizontal(c)
         timeCard = ValueCard(c, tr("Durée"), Icon.Kind.CLOCK)
         tempCard = ValueCard(c, tr("Température"), Icon.Kind.THERMO)
         speedCard = ValueCard(c, tr("Vitesse"), Icon.Kind.SPEED)
+        clockArt = ClockArt(c)
+        steam = SteamView(c)
+        motor = MotorView(c)
+        timeCard.art(clockArt)
+        tempCard.art(steam)
+        speedCard.art(motor)
         val all = listOf(timeCard, tempCard, speedCard)
         for ((i, card) in all.withIndex()) {
             card.onSelect = { selected = i; refresh() }
             card.onMinus = { change(i, -1) }
             card.onPlus = { change(i, 1) }
-            cards.addView(card, LinearLayout.LayoutParams(0, Ui.MATCH, 1f).apply { if (i < 2) rightMargin = Ui.u(14) })
+            cards.addView(card, LinearLayout.LayoutParams(0, Ui.MATCH, 1f).apply { if (i < 2) rightMargin = Ui.u(16) })
         }
-        left.addView(cards, LinearLayout.LayoutParams(Ui.MATCH, 0, 1f))
+        root.addView(cards, LinearLayout.LayoutParams(Ui.MATCH, 0, 1f))
 
-        val options = Ui.horizontal(c)
+        val options = Ui.horizontal(c, Gravity.CENTER_VERTICAL)
         dirRow = Ui.horizontal(c)
         accRow = Ui.horizontal(c)
         options.addView(dirRow)
-        options.addView(Ui.spacer(c, w = 18))
+        options.addView(Ui.spacer(c, w = 14))
         options.addView(accRow)
-        options.addView(Ui.spacer(c, weight = 1f), LinearLayout.LayoutParams(0, 1, 1f))
+        options.addView(Ui.spacer(c, w = 14))
+        options.addView(Ui.button(c, tr("Balance"), Ui.Style.GHOST, Icon.Kind.SCALE, height = 56, textSize = 17f) { a.push(ScaleScreen(a)) })
+        hint = Ui.text(c, "", 15f, Ui.WARN).apply { gravity = Gravity.CENTER; maxLines = 2 }
+        options.addView(hint, LinearLayout.LayoutParams(0, Ui.WRAP, 1f).apply { leftMargin = Ui.u(10); rightMargin = Ui.u(10) })
         turbo = HoldButton(c, "Turbo", onDown = {
             a.machine.turboDown(accessory) { v -> if (!v.ok) a.refusal(v) }
         }, onUp = { a.machine.turboUp() })
-        options.addView(turbo, Ui.lp(Ui.WRAP, Ui.u(64)))
-        left.addView(options, Ui.lp(Ui.MATCH, Ui.WRAP, t = 16))
-        root.addView(left, LinearLayout.LayoutParams(0, Ui.MATCH, 1f).apply { rightMargin = Ui.u(20) })
-
-        val right = Ui.vertical(c, Gravity.CENTER_HORIZONTAL)
-        right.background = Ui.round(Ui.SURFACE, 26f)
-        right.setPadding(Ui.u(18), Ui.u(14), Ui.u(18), Ui.u(18))
-        ring = TempRing(c)
-        right.addView(ring, LinearLayout.LayoutParams(Ui.MATCH, 0, 1f))
-        weight = Ui.text(c, "", 18f, Ui.TEXT2)
-        right.addView(weight, Ui.lp(Ui.WRAP, Ui.WRAP, t = 2))
-        hint = Ui.text(c, "", 16f, Ui.WARN).apply { gravity = Gravity.CENTER }
-        right.addView(hint, Ui.lp(Ui.MATCH, Ui.WRAP, t = 8))
-        startBtn = Ui.button(c, tr("Démarrer"), Ui.Style.PRIMARY, Icon.Kind.PLAY, height = 80, textSize = 24f) { start() }
-        right.addView(startBtn, Ui.lp(Ui.MATCH, Ui.WRAP, t = 12))
-        root.addView(right, LinearLayout.LayoutParams(Ui.u(300), Ui.MATCH))
+        options.addView(turbo, Ui.lp(Ui.WRAP, Ui.u(64), r = 12))
+        startBtn = Ui.button(c, tr("Démarrer"), Ui.Style.PRIMARY, Icon.Kind.PLAY, height = 70, textSize = 23f) { start() }
+        options.addView(startBtn, Ui.lp(Ui.u(230), Ui.WRAP))
+        root.addView(options, Ui.lp(Ui.MATCH, Ui.WRAP, t = 16))
         refresh()
         return root
     }
@@ -229,9 +228,17 @@ class ManualScreen(a: MainActivity, preset: app.toque.core.recipes.StepMachine? 
     }
 
     override fun onSnapshot(s: Snapshot) {
-        ring.set(if (s.hasSample) s.actualTempC else 0, if (s.jobActive && s.jobTempLevel > 0) Mcc.celsiusForLevel(s.jobTempLevel) else
-            if (tempLevel > 0) Mcc.celsiusForLevel(tempLevel) else 0, s.speedLevel)
-        weight.text = if (s.hasSample) tr("Balance : %d g", s.weightG) else tr("Base non connectée")
+        motor.running = s.jobActive && s.motorOn
+        motor.speed = if (s.jobActive) s.speedLevel else speed
+        motor.turbo = s.turboActive
+        motor.reverse = if (s.jobActive) s.jobReverse else reverse
+        motor.tempC = s.actualTempC
+        motor.heating = s.heaterOn
+        if (s.turboActive) motor.running = true
+        steam.tempC = if (s.hasSample && s.actualTempC > 0) s.actualTempC else if (tempLevel > 0) Mcc.celsiusForLevel(tempLevel) else 0
+        steam.active = s.heaterOn || (s.hasSample && s.actualTempC >= 50)
+        clockArt.running = s.jobActive && s.state == JobState.RUNNING
+        clockArt.fraction = if (s.jobActive && s.totalMs > 0) s.remainingMs.toFloat() / s.totalMs else 0f
         val manualJob = s.kind?.name == "MANUAL" && (s.state == JobState.RUNNING || s.state == JobState.STARTING || s.state == JobState.PAUSED)
         live = manualJob && s.state != JobState.PAUSED
         tempCard.repeatEnabled = !live

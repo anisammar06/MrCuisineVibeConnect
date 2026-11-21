@@ -224,3 +224,122 @@ class MotorView(c: Context) : View(c) {
         if (running) postInvalidateOnAnimation() else last = 0L
     }
 }
+
+/** Casserole stylisée : halo de chaleur et volutes de vapeur qui montent quand c'est chaud. */
+class SteamView(c: Context) : View(c) {
+    /** Température affichée (mesurée, ou consigne si rien ne chauffe encore). */
+    var tempC = 0
+        set(v) { if (field != v) { field = v; invalidate() } }
+    /** Animation active (chauffe en cours ou contenu chaud). */
+    var active = false
+        set(v) { val was = field; field = v; if (v && !was) postInvalidateOnAnimation() else invalidate() }
+
+    private var t = 0f
+    private var last = 0L
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val wisp = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
+    private val path = Path()
+    private val rect = RectF()
+
+    private fun heat(t: Int): Int = when {
+        t >= 100 -> mix(0xFFFF8A3D.toInt(), 0xFFFF3D3D.toInt(), (t - 100) / 30f)
+        t >= 50 -> mix(0xFFFFC14D.toInt(), 0xFFFF8A3D.toInt(), (t - 50) / 50f)
+        t > 0 -> mix(Ui.COOL, 0xFFFFC14D.toInt(), t / 50f)
+        else -> 0xFF5A6270.toInt()
+    }
+
+    override fun onDraw(cv: Canvas) {
+        val now = System.nanoTime() / 1_000_000L
+        val dt = if (last == 0L) 0f else ((now - last).coerceAtMost(100)) / 1000f
+        last = now
+        t += dt
+        val w = width.toFloat()
+        val h = height.toFloat()
+        val col = heat(tempC)
+        val potW = w * 0.62f
+        val potH = h * 0.30f
+        val px = (w - potW) / 2f
+        val py = h * 0.62f
+        // Halo de chaleur sous la casserole.
+        p.shader = RadialGradient(w / 2f, py + potH, w * 0.55f, intArrayOf(alpha(col, if (active) 120 else 40), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
+        cv.drawCircle(w / 2f, py + potH, w * 0.55f, p)
+        // Casserole en relief.
+        p.shader = LinearGradient(0f, py, 0f, py + potH, 0xFF3A404A.toInt(), 0xFF1A1D22.toInt(), Shader.TileMode.CLAMP)
+        rect.set(px, py, px + potW, py + potH)
+        cv.drawRoundRect(rect, potH * 0.25f, potH * 0.25f, p)
+        p.shader = null
+        p.color = alpha(col, 220)
+        rect.set(px - potW * 0.06f, py - potH * 0.08f, px + potW * 1.06f, py + potH * 0.08f)
+        cv.drawRoundRect(rect, potH * 0.1f, potH * 0.1f, p)
+        // Volutes de vapeur.
+        if (active || tempC >= 50) {
+            val n = 3
+            for (i in 0 until n) {
+                val phase = ((t * 0.55f + i / n.toFloat()) % 1f)
+                val baseX = px + potW * (0.25f + 0.25f * i)
+                val y0 = py - potH * 0.2f
+                val rise = h * 0.5f * phase
+                wisp.strokeWidth = w * 0.035f * (1f - phase * 0.5f)
+                wisp.color = Color.argb((170 * (1f - phase)).toInt(), 235, 240, 248)
+                path.reset()
+                path.moveTo(baseX, y0 - rise)
+                for (k in 1..6) {
+                    val yy = y0 - rise - k * h * 0.045f
+                    val xx = baseX + sin(t * 3f + k * 0.9f + i) * w * 0.05f
+                    path.lineTo(xx, yy)
+                }
+                cv.drawPath(path, wisp)
+            }
+        }
+        if (active || tempC >= 50) postInvalidateOnAnimation() else last = 0L
+    }
+}
+
+/** Cadran du temps : anneau du temps restant et aiguille qui tourne pendant le programme. */
+class ClockArt(c: Context) : View(c) {
+    var fraction = 0f
+        set(v) { field = v.coerceIn(0f, 1f); invalidate() }
+    var running = false
+        set(v) { val was = field; field = v; if (v && !was) postInvalidateOnAnimation() else invalidate() }
+
+    private var angle = 0f
+    private var last = 0L
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val arc = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
+    private val box = RectF()
+
+    override fun onDraw(cv: Canvas) {
+        val now = System.nanoTime() / 1_000_000L
+        val dt = if (last == 0L) 0f else ((now - last).coerceAtMost(100)) / 1000f
+        last = now
+        if (running) angle = (angle + dt * 90f) % 360f
+        val r = min(width, height) / 2f
+        val cx = width / 2f
+        val cy = height / 2f
+        p.shader = LinearGradient(cx, cy - r, cx, cy + r, 0xFF2C3139.toInt(), 0xFF111317.toInt(), Shader.TileMode.CLAMP)
+        cv.drawCircle(cx, cy, r * 0.82f, p)
+        p.shader = null
+        arc.strokeWidth = r * 0.12f
+        box.set(cx - r * 0.9f, cy - r * 0.9f, cx + r * 0.9f, cy + r * 0.9f)
+        arc.shader = null
+        arc.color = 0xFF22262D.toInt()
+        cv.drawArc(box, -90f, 360f, false, arc)
+        if (fraction > 0f) {
+            val g = SweepGradient(cx, cy, intArrayOf(0xFF6A5CFF.toInt(), Ui.COOL, 0xFF3DDC84.toInt()), null)
+            val m = Matrix()
+            m.setRotate(-90f, cx, cy)
+            g.setLocalMatrix(m)
+            arc.shader = g
+            cv.drawArc(box, -90f, 360f * fraction, false, arc)
+            arc.shader = null
+        }
+        // Aiguille.
+        val a = Math.toRadians((angle - 90).toDouble()).toFloat()
+        arc.strokeWidth = r * 0.07f
+        arc.color = if (running) Ui.TEXT else 0xFF8A93A3.toInt()
+        cv.drawLine(cx, cy, cx + r * 0.55f * cos(a), cy + r * 0.55f * sin(a), arc)
+        p.color = Ui.ACCENT
+        cv.drawCircle(cx, cy, r * 0.1f, p)
+        if (running) postInvalidateOnAnimation() else last = 0L
+    }
+}

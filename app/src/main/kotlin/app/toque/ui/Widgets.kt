@@ -17,6 +17,7 @@ class ValueCard(c: Context, label: String, icon: Icon.Kind) : LinearLayout(c) {
     private val unitView = Ui.text(c, "", 22f, Ui.TEXT2, Ui.LIGHT)
     private val subView = Ui.ellipsize(Ui.text(c, "", 16f, Ui.TEXT3))
     private val iconView = Icon(c, icon, Ui.TEXT2)
+    private val artSlot = android.widget.FrameLayout(c)
     private val minus: View
     private val plus: View
     var onMinus: () -> Unit = {}
@@ -36,8 +37,13 @@ class ValueCard(c: Context, label: String, icon: Icon.Kind) : LinearLayout(c) {
         val row = Ui.horizontal(c, Gravity.BOTTOM)
         row.addView(valueView)
         row.addView(unitView, Ui.lp(Ui.WRAP, Ui.WRAP, l = 6, b = 10))
-        addView(row, Ui.lp(t = 10))
-        addView(subView, Ui.lp(t = 2))
+        val mid = Ui.horizontal(c, Gravity.CENTER_VERTICAL)
+        val texts = Ui.vertical(c)
+        texts.addView(row)
+        texts.addView(subView, Ui.lp(t = 2))
+        mid.addView(texts, LayoutParams(0, Ui.WRAP, 1f))
+        mid.addView(artSlot, LayoutParams(Ui.u(104), Ui.u(104)))
+        addView(mid, Ui.lp(t = 6))
         addView(Ui.spacer(c, h = 0, weight = 1f))
         val buttons = Ui.horizontal(c)
         minus = Ui.button(c, "", Ui.Style.SECONDARY, Icon.Kind.MINUS, height = 60) { onSelect(); onMinus() }
@@ -70,8 +76,20 @@ class ValueCard(c: Context, label: String, icon: Icon.Kind) : LinearLayout(c) {
         Ui.setButtonEnabled(plus, on)
     }
 
+    /** Illustration animée à droite de la valeur (lames, vapeur, cadran). */
+    fun art(v: View) {
+        artSlot.removeAllViews()
+        artSlot.addView(v, android.widget.FrameLayout.LayoutParams(Ui.MATCH, Ui.MATCH))
+    }
+
     private fun refreshBg() {
-        background = Ui.round(Ui.SURFACE, 26f, if (isSel) Ui.ACCENT else Ui.STROKE, if (isSel) 2.5f else 1f)
+        // Carte en relief : dégradé du haut vers le bas, liseré clair, accent quand elle est choisie.
+        background = android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+            if (isSel) intArrayOf(0xFF2E2620.toInt(), 0xFF1A1714.toInt(), 0xFF141619.toInt()) else intArrayOf(0xFF23272E.toInt(), 0xFF181B20.toInt(), 0xFF121417.toInt())).apply {
+            cornerRadius = Ui.uf(26f)
+            setStroke(Ui.u(if (isSel) 2 else 1), if (isSel) Ui.ACCENT else 0x1FFFFFFF)
+        }
+        elevation = Ui.uf(if (isSel) 10f else 4f)
         iconView.color = if (isSel) Ui.ACCENT else Ui.TEXT2
     }
 
