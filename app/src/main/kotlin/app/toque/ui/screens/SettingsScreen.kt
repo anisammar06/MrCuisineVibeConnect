@@ -115,7 +115,7 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
 
         // ---- Sécurité
         val safety = section(left, tr("Sécurité"), Icon.Kind.WARNING)
-        safety.addView(toggle(tr("Exiger la détection du bol"), a.prefs.requireBowl) { on ->
+        safety.addView(toggle(tr("Exiger la détection du bol (expérimental)"), a.prefs.requireBowl) { on ->
             a.prefs.requireBowl = on
             a.machine.reconfigure { a.refusal(it) }
         })

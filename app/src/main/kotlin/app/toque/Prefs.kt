@@ -174,6 +174,15 @@ class Prefs(context: Context) {
             p.edit().putString("vendorPackage", v).commit()
         }
 
+    /**
+     * Le « bit NTC » de la base n'est pas une détection fiable du bol (la carte peut le laisser à 0 bol
+     * en place, et l'appli d'origine ne s'en sert pas) : l'option a été désactivée une fois pour toutes
+     * en 0.19.2 ; on peut la réactiver si le diagnostic montre qu'il change bien.
+     */
+    fun migrateBowlCheck() {
+        if (!p.getBoolean("bowlCheckReset", false)) p.edit().putBoolean("requireBowl", false).putBoolean("bowlCheckReset", true).commit()
+    }
+
     var requireBowl: Boolean
         get() = p.getBoolean("requireBowl", false)
         set(v) {

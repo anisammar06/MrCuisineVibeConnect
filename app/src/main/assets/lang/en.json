@@ -133,7 +133,6 @@
   "Erreur inattendue : %s": "Unexpected error: %s",
   "Erreur moteur": "Motor error",
   "Espace de stockage insuffisant sur le robot": "Not enough storage space on the robot",
-  "Exiger la détection du bol": "Require bowl detection",
   "Facile": "Easy",
   "Faites maintenant l'action « %s » sur le bouton du robot…": "Now do “%s” on the robot's knob…",
   "Favori": "Favourite",
@@ -664,5 +663,6 @@
   "Recherche": "Search",
   "Titre, artiste, album, playlist…": "Track, artist, album, playlist…",
   "Tout lire": "Play all",
-  "Pour chercher dans tout Spotify, ajoutez les identifiants de votre appli Spotify depuis le téléphone (Réglages › Assistant, code QR).": "To search all of Spotify, add your Spotify app credentials from your phone (Settings › Assistant, QR code)."
+  "Pour chercher dans tout Spotify, ajoutez les identifiants de votre appli Spotify depuis le téléphone (Réglages › Assistant, code QR).": "To search all of Spotify, add your Spotify app credentials from your phone (Settings › Assistant, QR code).",
+  "Exiger la détection du bol (expérimental)": "Require bowl detection (experimental)"
 }
