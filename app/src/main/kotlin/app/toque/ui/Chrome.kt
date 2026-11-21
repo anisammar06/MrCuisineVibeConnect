@@ -100,7 +100,7 @@ class TopBar(private val a: MainActivity) : LinearLayout(a) {
         for ((i, e) in entries.withIndex()) {
             val (kind, open) = e
             val ic = Icon(a, kind, Ui.TEXT2)
-            ic.setPadding(Ui.u(9), Ui.u(9), Ui.u(9), Ui.u(9))
+            ic.setPadding(Ui.u(11), Ui.u(11), Ui.u(11), Ui.u(11))
             ic.background = Ui.pressable(Ui.round(0, 20f), 20f)
             ic.setOnClickListener {
                 val sc = open()

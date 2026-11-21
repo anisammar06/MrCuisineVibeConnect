@@ -42,9 +42,9 @@ class ValueCard(c: Context, label: String, icon: Icon.Kind) : LinearLayout(c) {
         texts.addView(row)
         texts.addView(subView, Ui.lp(t = 2))
         mid.addView(texts, LayoutParams(0, Ui.WRAP, 1f))
-        mid.addView(artSlot, LayoutParams(Ui.u(104), Ui.u(104)))
         addView(mid, Ui.lp(t = 6))
-        addView(Ui.spacer(c, h = 0, weight = 1f))
+        // Illustration animée au centre de la carte (cadran, vapeur, lames).
+        addView(artSlot, LayoutParams(Ui.MATCH, 0, 1f).apply { topMargin = Ui.u(6); bottomMargin = Ui.u(4) })
         val buttons = Ui.horizontal(c)
         minus = Ui.button(c, "", Ui.Style.SECONDARY, Icon.Kind.MINUS, height = 60) { onSelect(); onMinus() }
         plus = Ui.button(c, "", Ui.Style.SECONDARY, Icon.Kind.PLUS, height = 60) { onSelect(); onPlus() }
@@ -79,7 +79,7 @@ class ValueCard(c: Context, label: String, icon: Icon.Kind) : LinearLayout(c) {
     /** Illustration animée à droite de la valeur (lames, vapeur, cadran). */
     fun art(v: View) {
         artSlot.removeAllViews()
-        artSlot.addView(v, android.widget.FrameLayout.LayoutParams(Ui.MATCH, Ui.MATCH))
+        artSlot.addView(v, android.widget.FrameLayout.LayoutParams(Ui.u(190), Ui.u(190), Gravity.CENTER))
     }
 
     private fun refreshBg() {
