@@ -264,6 +264,39 @@ class CookidooClient(private val context: Context) {
         @Volatile private var factory: SSLSocketFactory? = null
 
         /** Certificats du système + racines récentes fournies avec l'appli. */
+        /**
+         * Chaîne serveur → racine embarquée : chaque signature, dates de validité, droits d'autorité (CA, keyCertSign)
+         * des émetteurs, usage serveur de la feuille. Vrai seulement si la chaîne aboutit à une racine de [anchors].
+         */
+        internal fun strictCheck(chain: Array<X509Certificate>, anchors: Array<X509Certificate>): Boolean = try {
+            if (chain.isEmpty()) false else {
+                val leaf = chain[0]
+                leaf.checkValidity()
+                val eku = leaf.extendedKeyUsage
+                if (eku != null && "1.3.6.1.5.5.7.3.1" !in eku && "2.5.29.37.0" !in eku) throw java.security.cert.CertificateException("EKU")
+                var cur = leaf
+                var ok = false
+                for (depth in 0 until 6) {
+                    // Racine embarquée qui a signé le certificat courant : fin du chemin.
+                    val anchor = anchors.firstOrNull { a ->
+                        a.subjectX500Principal == cur.issuerX500Principal && runCatching { cur.verify(a.publicKey) }.isSuccess
+                    }
+                    if (anchor != null) { anchor.checkValidity(); ok = true; break }
+                    val issuer = chain.drop(1).firstOrNull { i ->
+                        i.subjectX500Principal == cur.issuerX500Principal && runCatching { cur.verify(i.publicKey) }.isSuccess
+                    } ?: break
+                    issuer.checkValidity()
+                    if (issuer.basicConstraints < 0) break
+                    val ku = issuer.keyUsage
+                    if (ku != null && !ku[5]) break
+                    cur = issuer
+                }
+                ok
+            }
+        } catch (_: Exception) {
+            false
+        }
+
         fun sslFactory(c: Context): SSLSocketFactory {
             factory?.let { return it }
             val system = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply { init(null as KeyStore?) }
@@ -281,7 +314,14 @@ class CookidooClient(private val context: Context) {
                     try {
                         system.checkServerTrusted(chain, authType)
                     } catch (e: java.security.cert.CertificateException) {
-                        bundled.checkServerTrusted(chain, authType)
+                        try {
+                            bundled.checkServerTrusted(chain, authType)
+                        } catch (e2: java.security.cert.CertificateException) {
+                            // Le validateur d'Android 6 refuse certaines chaînes récentes (Let's Encrypt « génération Y »,
+                            // toute en ECDSA P-384) que les navigateurs acceptent : vérification stricte faite ici,
+                            // limitée aux racines embarquées. Le nom du site reste vérifié par HttpsURLConnection.
+                            if (!strictCheck(chain, bundled.acceptedIssuers)) throw e2
+                        }
                     }
                 }
                 override fun getAcceptedIssuers(): Array<X509Certificate> = system.acceptedIssuers + bundled.acceptedIssuers
