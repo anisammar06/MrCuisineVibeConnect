@@ -1,6 +1,7 @@
 package app.toque.machine
 
 import android.app.Notification
+import app.toque.core.json.Json
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
@@ -131,7 +132,16 @@ class MachineService : Service() {
         m.data = Ipc.snapshotToBundle(s)
         send(m)
         updateNotification(s)
+        // État lisible pour le dépannage (adb) : trames brutes et drapeaux, au plus toutes les 2 s.
+        if (now - lastDumpAt >= 2_000) {
+            lastDumpAt = now
+            try {
+                java.io.File(filesDir, "machine-etat.json").writeText(Json.write(s.toMap()))
+            } catch (_: Exception) {
+            }
+        }
     }
+    private var lastDumpAt = 0L
 
     private fun updateNotification(s: Snapshot) {
         val text = when {
