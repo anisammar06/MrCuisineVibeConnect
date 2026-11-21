@@ -47,6 +47,7 @@ class TopBar(private val a: MainActivity) : LinearLayout(a) {
     private val home = Icon(a, Icon.Kind.HOME, Ui.TEXT2)
     /** Minuteurs de cuisine en cours, visibles sur tous les écrans. */
     private val timers = Ui.horizontal(a)
+    private val tools: LinearLayout
     private val handler = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
         override fun run() {
@@ -68,6 +69,25 @@ class TopBar(private val a: MainActivity) : LinearLayout(a) {
         back.setOnClickListener { if (a.depth > 1) a.back() else a.push(app.toque.ui.screens.SettingsScreen(a)) }
         addView(back, LayoutParams(Ui.u(52), Ui.u(52)))
         addView(titleView, LayoutParams(0, Ui.WRAP, 1f).apply { leftMargin = Ui.u(6) })
+        // Outils du robot accessibles depuis n'importe quel écran.
+        tools = Ui.horizontal(a, Gravity.CENTER_VERTICAL)
+        for ((kind, open) in listOf<Pair<Icon.Kind, () -> Screen>>(
+            Icon.Kind.SCALE to { app.toque.ui.screens.ScaleScreen(a) },
+            Icon.Kind.CLOCK to { app.toque.ui.screens.TimersScreen(a) },
+            Icon.Kind.POT to { app.toque.ui.screens.ManualScreen(a) },
+            Icon.Kind.CHECK to { app.toque.ui.screens.ShoppingScreen(a) },
+            Icon.Kind.PLAY to { app.toque.ui.screens.MediaScreen(a) },
+        )) {
+            val ic = Icon(a, kind, Ui.TEXT2)
+            ic.setPadding(Ui.u(11), Ui.u(11), Ui.u(11), Ui.u(11))
+            ic.background = Ui.pressable(Ui.round(0x14FFFFFF, 26f), 26f)
+            ic.setOnClickListener {
+                val s = open()
+                if (a.current?.javaClass != s.javaClass) a.push(s)
+            }
+            tools.addView(ic, LayoutParams(Ui.u(48), Ui.u(48)).apply { rightMargin = Ui.u(6) })
+        }
+        addView(tools, Ui.lp(Ui.WRAP, Ui.WRAP, r = 12))
         addView(timers, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
         addView(lid, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
         addView(bowl, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))

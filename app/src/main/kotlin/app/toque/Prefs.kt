@@ -406,6 +406,19 @@ class Prefs(context: Context) {
             p.edit().putString("spotifyClientSecret", v).commit()
         }
 
+    /** Petits commentaires spontanés de l'assistant (bonjour, mises en garde, conseils). */
+    var leaRemarks: Boolean
+        get() = p.getBoolean("leaRemarks", true)
+        set(v) {
+            p.edit().putBoolean("leaRemarks", v).commit()
+        }
+
+    var lastGreetAt: Long
+        get() = p.getLong("lastGreetAt", 0L)
+        set(v) {
+            p.edit().putLong("lastGreetAt", v).commit()
+        }
+
     /** Ville pour la météo et les recherches locales de l'assistant. */
     var assistantCity: String
         get() = p.getString("assistantCity", "") ?: ""

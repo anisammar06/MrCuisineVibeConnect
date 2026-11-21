@@ -53,39 +53,53 @@ object Assistant {
     }
 
     /** Lit une phrase (test de la voix). */
-    fun say(c: Context, text: String) {
+    fun say(c: Context, text: String, show: Boolean = false) {
         val app = c.applicationContext
         exec.execute {
             VoiceService.pauseFor(app, 60_000)
             interrupted = false
             busy = true
-            try { speak(app, text) } finally { busy = false; VoiceService.resume(app, follow = false) }
+            if (show) Bubble.show(app, "", text)
+            try { speak(app, text) } catch (_: Exception) {} finally {
+                busy = false
+                if (show) Bubble.hideLater(6_000)
+                VoiceService.resume(app, follow = false)
+            }
         }
     }
 
-    private fun run(c: Context, lang: String, offline: () -> Boolean = { false }, question: () -> String) {
+    /** Commentaire spontané (consigne pour Claude, non affichée comme une question). */
+    fun remark(c: Context, instruction: String) {
+        val app = c.applicationContext
+        if (busy) return
+        exec.execute { if (!busy) run(app, Prefs(app).voiceLang, spontaneous = true) { "(Commentaire spontané, n'utilise aucun outil et n'agis sur rien : $instruction)" } }
+    }
+
+    private fun run(c: Context, lang: String, offline: () -> Boolean = { false }, spontaneous: Boolean = false, question: () -> String) {
         busy = true
         interrupted = false
         ScreenPower.wake(c, 20_000)
         Ring.set(Ring.State.THINKING)
         var follow = false
         try {
-            Bubble.show(c, "", pick(lang, "J'écoute…", "Słucham…"))
+            if (!spontaneous) Bubble.show(c, "", pick(lang, "J'écoute…", "Słucham…")) else VoiceService.pauseFor(c, 90_000)
             val q = question().trim()
             if (q.isEmpty() || q.length < 2) {
                 Bubble.show(c, "", pick(lang, "Je n'ai rien entendu.", "Nic nie usłyszałem."))
                 Bubble.hideLater(4000)
                 return
             }
-            Bubble.show(c, q, pick(lang, "Je réfléchis…", "Myślę…"))
-            val answer = converse(c, q, lang).ifBlank { pick(lang, "D'accord.", "Dobrze.") }
-            Bubble.show(c, q, answer)
+            val shown = if (spontaneous) "" else q
+            if (!spontaneous) Bubble.show(c, shown, pick(lang, "Je réfléchis…", "Myślę…"))
+            val answer = converse(c, q, lang).ifBlank { if (spontaneous) return else pick(lang, "D'accord.", "Dobrze.") }
+            Bubble.show(c, shown, answer)
             ToqueApp.of(c).log.write("assistant", "« $q » → « ${answer.take(200)} »")
             speak(c, answer)
             follow = !interrupted
             Bubble.hideLater(15_000)
         } catch (e: Exception) {
             ToqueApp.of(c).log.write("assistant", "erreur : $e")
+            if (spontaneous) return
             Ring.set(Ring.State.ALERT, 3_000)
             if (e is IOException && offline()) {
                 Bubble.hideLater(0)

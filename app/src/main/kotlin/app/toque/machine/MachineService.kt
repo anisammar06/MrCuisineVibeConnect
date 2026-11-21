@@ -120,7 +120,25 @@ class MachineService : Service() {
         log.write("machine", "boucle démarrée en mode ${mode.label}")
     }
 
+    private var lastFlags = ""
+
+    /**
+     * Journalise les changements des octets d'état de la base (hors moteur, stabilité, sens) : sert à
+     * trouver un éventuel signal de présence du bol en le retirant et le remettant.
+     */
+    private fun traceFlags(s: Snapshot) {
+        val b = s.rxHex.split(' ')
+        if (b.size < 27) return
+        val st = (b[3].toIntOrNull(16) ?: return) and 0xF0
+        val flags = "statut=%02X ext=%s b24=%s b25=%s".format(st, b[4], b[24], b[25])
+        if (flags != lastFlags) {
+            if (lastFlags.isNotEmpty()) log.write("base", "$lastFlags → $flags (temp ${s.actualTempC} °C, ${s.weightG} g)")
+            lastFlags = flags
+        }
+    }
+
     private fun publish(s: Snapshot) {
+        traceFlags(s)
         val now = System.currentTimeMillis()
         val prev = lastSent
         val changed = prev == null || prev.copy(sampleAgeMs = 0, txFrames = 0, rxFrames = 0, txHex = "") !=

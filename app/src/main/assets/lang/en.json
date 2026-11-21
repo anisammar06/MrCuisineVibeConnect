@@ -664,5 +664,8 @@
   "Titre, artiste, album, playlist…": "Track, artist, album, playlist…",
   "Tout lire": "Play all",
   "Pour chercher dans tout Spotify, ajoutez les identifiants de votre appli Spotify depuis le téléphone (Réglages › Assistant, code QR).": "To search all of Spotify, add your Spotify app credentials from your phone (Settings › Assistant, QR code).",
-  "Exiger la détection du bol (expérimental)": "Require bowl detection (experimental)"
+  "Exiger la détection du bol (expérimental)": "Require bowl detection (experimental)",
+  "Petits commentaires de l'assistant (bonjour, mises en garde, conseils en cuisinant)": "Little comments from the assistant (greetings, warnings, cooking tips)",
+  "Pesez librement ; la tare remet à zéro.": "Weigh freely; tare resets to zero.",
+  "Posez le bol sur la base, faites la tare, puis versez.": "Put the bowl on the base, tare, then pour."
 }

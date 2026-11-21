@@ -21,6 +21,9 @@ import app.toque.core.recipes.Recipe
 import app.toque.core.recipes.StepProgram
 import app.toque.kitchen.Cooked
 import app.toque.ui.HoldButton
+import app.toque.ui.MotorView
+import app.toque.ui.WeighGauge
+import app.toque.assistant.Remarks
 import app.toque.ui.Icon
 import app.toque.ui.MainActivity
 import app.toque.ui.ProgressLine
@@ -57,10 +60,13 @@ class CookScreen(a: MainActivity, val recipe: Recipe, startStep: Int) : Screen(a
     private lateinit var weighLabel: TextView
     private lateinit var weighValue: TextView
     private lateinit var weighBar: ProgressLine
+    private lateinit var gauge: WeighGauge
+    private var motor: MotorView? = null
     private lateinit var ingRow: LinearLayout
     /** Ce qu'on pèse en ce moment (cible de l'étape, ou ingrédient choisi) ; null : balance seule. */
     private var weighTarget: Weigh? = null
     private var scaleOpen = false
+    private var reachedFor: Weigh? = null
     private lateinit var panel: LinearLayout
     private lateinit var prevBtn: LinearLayout
     private lateinit var nextBtn: LinearLayout
@@ -85,24 +91,28 @@ class CookScreen(a: MainActivity, val recipe: Recipe, startStep: Int) : Screen(a
             addView(ingRow)
         }, Ui.lp(t = 10))
 
-        weighBox = Ui.vertical(c)
-        weighBox.background = Ui.round(Ui.SURFACE, 22f)
-        weighBox.setPadding(Ui.u(20), Ui.u(14), Ui.u(16), Ui.u(14))
-        val wRow = Ui.horizontal(c)
-        wRow.addView(Icon(c, Icon.Kind.SCALE, Ui.COOL), LinearLayout.LayoutParams(Ui.u(28), Ui.u(28)).apply { rightMargin = Ui.u(12) })
-        weighLabel = Ui.ellipsize(Ui.text(c, "", 19f, Ui.TEXT, Ui.MEDIUM))
-        wRow.addView(weighLabel, LinearLayout.LayoutParams(0, Ui.WRAP, 1f))
-        weighValue = Ui.text(c, "", 30f, Ui.TEXT, Ui.LIGHT)
-        wRow.addView(weighValue, Ui.lp(Ui.WRAP, Ui.WRAP, r = 14))
-        wRow.addView(Ui.button(c, tr("Tare"), Ui.Style.SECONDARY, height = 52) { a.machine.tare() })
-        wRow.addView(Ui.button(c, "", Ui.Style.GHOST, Icon.Kind.CLOSE, height = 52) {
+        // Balance : jauge circulaire animée + objectif + tare.
+        weighBox = Ui.horizontal(c, Gravity.CENTER_VERTICAL)
+        weighBox.background = android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+            intArrayOf(0xFF1B2230.toInt(), 0xFF15171B.toInt())).apply { cornerRadius = Ui.uf(22f); setStroke(Ui.u(1), 0x3349A6FF) }
+        weighBox.setPadding(Ui.u(12), Ui.u(8), Ui.u(16), Ui.u(8))
+        gauge = WeighGauge(c)
+        weighBox.addView(gauge, LinearLayout.LayoutParams(Ui.u(178), Ui.u(178)).apply { rightMargin = Ui.u(14) })
+        val wCol = Ui.vertical(c)
+        weighLabel = Ui.text(c, "", 21f, Ui.TEXT, Ui.MEDIUM).apply { maxLines = 2 }
+        wCol.addView(weighLabel)
+        weighValue = Ui.text(c, "", 16f, Ui.TEXT2)
+        wCol.addView(weighValue, Ui.lp(t = 4))
+        val wBtns = Ui.horizontal(c)
+        wBtns.addView(Ui.button(c, tr("Tare"), Ui.Style.SECONDARY, Icon.Kind.SCALE, height = 52) { a.machine.tare() }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 8))
+        wBtns.addView(Ui.button(c, "", Ui.Style.GHOST, Icon.Kind.CLOSE, height = 52) {
             weighTarget = null
             scaleOpen = false
             renderWeigh()
-        }, Ui.lp(Ui.WRAP, Ui.WRAP, l = 6))
-        weighBox.addView(wRow)
-        weighBar = ProgressLine(c).apply { color = Ui.COOL }
-        weighBox.addView(weighBar, Ui.lp(Ui.MATCH, Ui.u(8), t = 10))
+        })
+        wCol.addView(wBtns, Ui.lp(t = 12))
+        weighBox.addView(wCol, LinearLayout.LayoutParams(0, Ui.WRAP, 1f))
+        weighBar = ProgressLine(c)
         left.addView(weighBox, Ui.lp(t = 12))
         body.addView(left, LinearLayout.LayoutParams(0, Ui.MATCH, 1f).apply { rightMargin = Ui.u(22) })
 
@@ -198,6 +208,7 @@ class CookScreen(a: MainActivity, val recipe: Recipe, startStep: Int) : Screen(a
 
     private fun buildPanel() {
         panel.removeAllViews()
+        motor = null
         turboBtn = null
         reviewBtn = null
         val m = recipe.steps[index].machine
@@ -222,6 +233,7 @@ class CookScreen(a: MainActivity, val recipe: Recipe, startStep: Int) : Screen(a
         }
         badge.addView(Icon(c, kindIcon, Ui.ACCENT), Ui.flp(Ui.u(28), Ui.u(28), Gravity.CENTER))
         head.addView(badge, LinearLayout.LayoutParams(Ui.u(48), Ui.u(48)).apply { rightMargin = Ui.u(12) })
+        head.gravity = Gravity.CENTER_VERTICAL
         head.addView(Ui.text(c, when (m.program) {
             StepProgram.MANUAL -> tr("Réglage machine")
             StepProgram.KNEAD -> JobKind.KNEAD.label
@@ -230,6 +242,10 @@ class CookScreen(a: MainActivity, val recipe: Recipe, startStep: Int) : Screen(a
             StepProgram.TURBO -> JobKind.TURBO.label
         }, 22f, Ui.TEXT, Ui.MEDIUM))
         panel.addView(head)
+        // Animation du moteur (tourne pendant le programme, halo selon la température).
+        val mv = MotorView(c)
+        motor = mv
+        panel.addView(mv, LinearLayout.LayoutParams(Ui.MATCH, Ui.u(96)).apply { topMargin = Ui.u(6) })
 
         val grid = Ui.vertical(c)
         fun line(icon: Icon.Kind, label: String, value: String, color: Int = Ui.TEXT) {
@@ -366,18 +382,28 @@ class CookScreen(a: MainActivity, val recipe: Recipe, startStep: Int) : Screen(a
         val w = weighTarget
         weighBox.visibility = if (scaleOpen) View.VISIBLE else View.GONE
         weighLabel.text = if (w != null) tr("Pesez %d g", w.grams) + if (w.label.isNotBlank()) " · ${w.label}" else "" else tr("Balance")
-        weighBar.visibility = if (w != null) View.VISIBLE else View.GONE
+        weighValue.text = if (w != null) tr("Posez le bol sur la base, faites la tare, puis versez.") else tr("Pesez librement ; la tare remet à zéro.")
+        gauge.target = w?.grams ?: 0
         updateWeigh(a.snapshot)
     }
 
     private fun updateWeigh(s: Snapshot) {
         val w = weighTarget
         if (scaleOpen) {
-            weighValue.text = if (s.hasSample) "${s.weightG} g" else "—"
-            if (w != null) {
-                weighBar.progress = if (w.grams > 0) s.weightG.toFloat() / w.grams else 0f
-                weighBar.color = if (s.weightG > w.grams * 1.05f) Ui.WARN else Ui.COOL
+            gauge.connected = s.hasSample
+            gauge.grams = s.weightG
+            if (w != null && s.hasSample && s.scaleStable && s.weightG >= w.grams * 0.97f && s.weightG <= w.grams * 1.05f && reachedFor != w) {
+                reachedFor = w
+                Remarks.weighed(a, w.label, s.weightG)
             }
+        }
+        motor?.let { m ->
+            m.running = s.jobActive && s.motorOn
+            m.speed = s.speedLevel
+            m.turbo = s.turboActive
+            m.reverse = s.jobReverse
+            m.tempC = s.actualTempC
+            m.heating = s.heaterOn
         }
     }
 
@@ -430,9 +456,19 @@ class CookScreen(a: MainActivity, val recipe: Recipe, startStep: Int) : Screen(a
         }
     }
 
+    private var welcomed = false
+
+    override fun onShow() {
+        if (!welcomed) {
+            welcomed = true
+            view.postDelayed({ Remarks.cookStart(a, recipe) }, 1500)
+        }
+    }
+
     override fun onEvent(e: MachineEvent) {
         if (e.type == EventType.JOB_FINISHED && launchedStep >= 0 && index >= launchedStep && index < launchedStep + launchedCount) {
             val finished = launchedStep + launchedCount - 1
+            if (!(a.prefs.chainSteps && continues(finished + 1))) Remarks.stepDone(a, recipe, finished)
             for (k in launchedStep..finished) done += k
             launchedStep = -1
             launchedCount = 1

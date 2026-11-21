@@ -371,6 +371,9 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         }, Ui.lp(Ui.WRAP, Ui.WRAP, l = 10))
         ia.addView(nameRow, Ui.lp(t = 6))
         ia.addView(iaNameInfo, Ui.lp(t = 4))
+        ia.addView(toggle(tr("Petits commentaires de l'assistant (bonjour, mises en garde, conseils en cuisinant)"), a.prefs.leaRemarks) { on ->
+            a.prefs.leaRemarks = on
+        }, Ui.lp(t = 12))
         ia.addView(Ui.text(c, tr("Ville (météo et recherches locales)"), 16f, Ui.TEXT2), Ui.lp(t = 12))
         val cityRow = Ui.horizontal(c)
         val city = EditText(c).apply {

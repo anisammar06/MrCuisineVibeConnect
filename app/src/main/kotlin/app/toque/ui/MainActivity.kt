@@ -10,6 +10,7 @@ import app.toque.kitchen.Timers
 import app.toque.ScreenPower
 import app.toque.Ring
 import app.toque.assistant.Assistant
+import app.toque.assistant.Remarks
 import app.toque.ui.screens.CookScreen
 import app.toque.media.ReceiverService
 import android.app.Activity
@@ -196,6 +197,7 @@ class MainActivity : Activity() {
         prefs.returnBubble = false
         ReturnBubble.stop(this)
         if (prefs.vendorSession) endVendorSession()
+        root.postDelayed({ if (resumed) Remarks.greet(this) }, 2500)
     }
 
     override fun onStop() {
@@ -358,7 +360,10 @@ class MainActivity : Activity() {
         when (e.type) {
             EventType.JOB_FINISHED -> chime(2)
             EventType.FAULT -> { chime(3); toast(e.message, Ui.DANGER); Ring.set(Ring.State.ALERT, 10_000) }
-            EventType.LID_OPENED -> if (snapshot.busy || snapshot.state != null) toast(tr("Couvercle ouvert : pause"), Ui.WARN)
+            EventType.LID_OPENED -> {
+                if (snapshot.busy || snapshot.state != null) toast(tr("Couvercle ouvert : pause"), Ui.WARN)
+                if (snapshot.actualTempC >= 60) Remarks.lidHot(this, snapshot.actualTempC)
+            }
             EventType.JOB_PAUSED -> if (e.message != PauseReason.USER.label) toast(e.message, Ui.WARN)
             EventType.TURBO_END -> toast(e.message, Ui.TEXT2)
             else -> Unit
