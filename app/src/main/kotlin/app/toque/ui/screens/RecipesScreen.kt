@@ -45,7 +45,7 @@ class RecipesScreen(
     /** Recettes polonaises téléchargées depuis aniagotuje.pl et kwestiasmaku.com (onglet par site). */
     private val web: Boolean = false,
 ) : Screen(a) {
-    override val title = if (web) tr("Przepisy – recettes polonaises") else if (thermomix) tr("Recettes Thermomix") else if (favorites) tr("Favoris") else tr("Recettes")
+    override val title = if (web) tr("Przepisy – recettes polonaises") else if (thermomix) tr("Recettes Thermomix") else if (favorites) tr("Favoris") else tr("Recettes Monsieur Cuisine")
 
     private val repo get() = if (web) a.app.web(a.prefs.webSite) else if (thermomix) a.app.thermomix else a.app.recipes
     private var lang: String

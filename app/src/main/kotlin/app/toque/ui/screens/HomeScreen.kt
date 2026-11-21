@@ -62,6 +62,18 @@ class HomeScreen(a: MainActivity) : Screen(a) {
         resumeCard.addView(Icon(c, Icon.Kind.PLAY, Ui.ACCENT), LinearLayout.LayoutParams(Ui.u(26), Ui.u(26)).apply { rightMargin = Ui.u(14) })
         resumeText = Ui.ellipsize(Ui.text(c, "", 19f, Ui.TEXT, Ui.MEDIUM), 2)
         resumeCard.addView(resumeText, LinearLayout.LayoutParams(0, Ui.WRAP, 1f))
+        // Abandonner la recette commencée (la pastille disparaît).
+        val cancel = Icon(c, Icon.Kind.CLOSE, Ui.TEXT2)
+        cancel.setPadding(Ui.u(12), Ui.u(12), Ui.u(12), Ui.u(12))
+        cancel.background = Ui.pressable(Ui.round(0x22FFFFFF, 22f), 22f)
+        cancel.isClickable = true
+        cancel.setOnClickListener {
+            a.prefs.guidedRecipe = ""
+            a.prefs.guidedStep = 0
+            a.toast(tr("Recette abandonnée"))
+            refresh()
+        }
+        resumeCard.addView(cancel, LinearLayout.LayoutParams(Ui.u(48), Ui.u(48)).apply { leftMargin = Ui.u(10) })
         resumeCard.isClickable = true
         resumeCard.setOnClickListener {
             val r = a.app.repoOf(a.prefs.guidedRecipe).get(a.prefs.guidedRecipe)
@@ -73,13 +85,13 @@ class HomeScreen(a: MainActivity) : Screen(a) {
         // Grille de 9 tuiles (3 × 3). Réglages : engrenage de la barre du haut.
         val grid = Ui.vertical(c)
         val rows = List(3) { Ui.horizontal(c) }
-        val (t1, s1) = tile(Icon.Kind.BOOK, tr("Recettes")) { a.push(RecipesScreen(a)) }
+        val (t1, s1) = tile(Icon.Kind.BOOK, tr("Monsieur Cuisine")) { a.push(RecipesScreen(a)) }
         recipesSub = s1
         rows[0].addView(t1, tileLp(true))
         rows[0].addView(tile(Icon.Kind.POT, tr("Cuisson manuelle"), tr("Temps, chaleur, vitesse")) { a.push(ManualScreen(a)) }.first, tileLp(true))
         rows[0].addView(tile(Icon.Kind.KNEAD, tr("Programmes"), tr("Pétrir, vapeur, rissoler")) { a.push(ProgramsScreen(a)) }.first, tileLp(false))
         // La balance reste accessible depuis la barre du haut ; à sa place, les recettes polonaises du web.
-        val (t4, s4) = tile(Icon.Kind.BOOK, tr("Przepisy PL")) { a.push(RecipesScreen(a, web = true)) }
+        val (t4, s4) = tile(Icon.Kind.BOOK, tr("Recettes polonaises")) { a.push(RecipesScreen(a, web = true)) }
         webSub = s4
         rows[1].addView(t4, tileLp(true))
         val (t5, s5) = tile(Icon.Kind.STAR, tr("Favoris")) { a.push(RecipesScreen(a, favorites = true)) }
@@ -144,7 +156,7 @@ class HomeScreen(a: MainActivity) : Screen(a) {
             SyncProgress.running -> SyncProgress.text
             !repo.loaded -> tr("Chargement…")
             n == 0 -> tr("Aucune recette Lidl pour l'instant")
-            a.app.recipesPl.count > 0 -> tr("%d FR · %d PL", a.app.recipesFr.count, a.app.recipesPl.count)
+            a.app.recipesPl.count > 0 -> tr("Recettes Lidl · %d FR · %d PL", a.app.recipesFr.count, a.app.recipesPl.count)
             else -> tr("%d recettes Lidl", n)
         }
         val favs = repo.index.entries.count { it.favorite }
@@ -153,7 +165,7 @@ class HomeScreen(a: MainActivity) : Screen(a) {
         val tmPl = a.app.tmPl.count
         tmSub.text = when {
             app.toque.recipes.CookidooProgress.running -> app.toque.recipes.CookidooProgress.text
-            tmFr + tmPl > 0 -> tr("%d FR · %d PL", tmFr, tmPl)
+            tmFr + tmPl > 0 -> tr("Cookidoo · %d FR · %d PL", tmFr, tmPl)
             app.toque.recipes.CookidooClient(c).loggedIn -> tr("Synchro à lancer")
             else -> tr("Cookidoo à connecter")
         }
@@ -161,7 +173,7 @@ class HomeScreen(a: MainActivity) : Screen(a) {
         val wk = a.app.webKwestia.count
         webSub?.text = when {
             app.toque.recipes.WebProgress.running -> app.toque.recipes.WebProgress.text
-            wa + wk > 0 -> tr("Ania %d · Kwestia %d", wa, wk)
+            wa + wk > 0 -> tr("Ania Gotuje %d · Kwestia Smaku %d", wa, wk)
             else -> tr("Ania Gotuje, Kwestia Smaku")
         }
         val shop = app.toque.kitchen.Shopping.get(c).remaining
