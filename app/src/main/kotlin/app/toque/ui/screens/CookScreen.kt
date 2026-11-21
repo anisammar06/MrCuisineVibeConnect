@@ -186,8 +186,12 @@ class CookScreen(a: MainActivity, val recipe: Recipe, startStep: Int) : Screen(a
         val step = recipe.steps[index]
         counter.text = tr("ÉTAPE %d SUR %d", index + 1, n)
         text.text = step.text.ifBlank { step.machine?.summary ?: "" }
-        stepPic.visibility = if (step.image.isNotBlank()) View.VISIBLE else View.GONE
-        if (step.image.isNotBlank()) ImageLoader.loadUrl(stepPic, step.image, Ui.u(360))
+        // La photo va dans le panneau de droite quand l'étape n'a pas de réglage machine ; sinon sous le texte.
+        val picLeft = step.image.isNotBlank() && step.machine != null
+        stepPic.visibility = if (picLeft) View.VISIBLE else View.GONE
+        if (picLeft) ImageLoader.loadUrl(stepPic, step.image, Ui.u(360))
+        // Longues étapes (recettes du web) : un peu plus petit pour tout voir sans défiler.
+        text.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, Ui.uf(if (text.text.length > 420) 22f else if (text.text.length > 220) 26f else 31f))
         val found = StepIngredients.match(step.text, recipe.allIngredients)
         val firstGrams = found.firstOrNull { StepIngredients.grams(it) != null }
         weighTarget = step.weigh ?: firstGrams?.let { Weigh(it.name, StepIngredients.grams(it)!!) }
@@ -226,6 +230,21 @@ class CookScreen(a: MainActivity, val recipe: Recipe, startStep: Int) : Screen(a
         turboBtn = null
         reviewBtn = null
         val m = recipe.steps[index].machine
+        val photo = recipe.steps[index].image
+        if (m == null && photo.isNotBlank()) {
+            // Étape sans réglage machine (recettes polonaises) : sa photo occupe le panneau de droite.
+            val pic = android.widget.ImageView(c).apply { scaleType = android.widget.ImageView.ScaleType.CENTER_CROP }
+            pic.background = Ui.round(Ui.SURFACE2, 18f)
+            pic.clipToOutline = true
+            pic.outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(v: View, o: android.graphics.Outline) = o.setRoundRect(0, 0, v.width, v.height, Ui.uf(18f))
+            }
+            panel.addView(pic, LinearLayout.LayoutParams(Ui.MATCH, 0, 1f).apply { bottomMargin = Ui.u(12) })
+            ImageLoader.loadUrl(pic, photo, Ui.u(420))
+            startBtn = Ui.button(c, tr("Étape suivante"), Ui.Style.SECONDARY, Icon.Kind.CHEVRON, height = 70) { next() }
+            panel.addView(startBtn)
+            return
+        }
         if (m == null) {
             val box = Ui.vertical(c, Gravity.CENTER)
             box.addView(Icon(c, Icon.Kind.CHECK, Ui.TEXT3), LinearLayout.LayoutParams(Ui.u(48), Ui.u(48)))

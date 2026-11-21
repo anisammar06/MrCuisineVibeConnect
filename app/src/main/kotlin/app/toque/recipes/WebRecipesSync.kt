@@ -59,17 +59,35 @@ object WebRecipesSync {
         Thread({ run(app, perSite) }, "toque-web-recettes").apply { priority = Thread.MIN_PRIORITY }.start()
     }
 
+    /** Version du lecteur de pages : quand elle change, les recettes déjà téléchargées sont relues. */
+    private const val PARSER = 2
+    private val status = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    private fun show(site: WebRecipes.Site, text: String) {
+        status[site.key] = text
+        WebProgress.update(true, WebRecipes.Site.values().mapNotNull { status[it.key] }.joinToString("  ·  "))
+    }
+
     fun run(c: Context, perSite: Int) {
         if (busy) return
         busy = true
         stopRequested = false
+        status.clear()
         val app = ToqueApp.of(c)
-        val lines = ArrayList<String>()
+        val prefs = c.getSharedPreferences("web-recettes", Context.MODE_MULTI_PROCESS)
+        if (prefs.getInt("parser", 1) < PARSER) {
+            // Recettes Ania lues avec l'ancien lecteur (groupes sans nom, boutons du site pris pour une étape).
+            app.webAnia.removeAllExcept(emptySet())
+            prefs.edit().putInt("parser", PARSER).commit()
+        }
+        val lines = java.util.Collections.synchronizedList(ArrayList<String>())
         try {
-            for (site in WebRecipes.Site.values()) {
-                if (stopRequested) break
-                lines += syncSite(c, site, perSite)
+            // Les deux sites en même temps (chacun à son rythme) : Kwestia n'attend pas la fin d'Ania.
+            val threads = WebRecipes.Site.values().map { site ->
+                Thread({ lines += try { syncSite(c, site, perSite) } catch (e: Exception) { "${site.label} : $e" } }, "web-" + site.key)
+                    .apply { priority = Thread.MIN_PRIORITY; start() }
             }
+            threads.forEach { it.join() }
         } finally {
             busy = false
             val result = lines.joinToString(" · ") + if (stopRequested) " · arrêté" else ""
@@ -83,21 +101,16 @@ object WebRecipesSync {
         val app = ToqueApp.of(c)
         val repo = app.web(site.key)
         val delay = if (site == WebRecipes.Site.KWESTIA) 10_000L else 2_000L
-        WebProgress.update(true, "${site.label} : liste des recettes…")
-        val urls = try {
-            listUrls(c, site, delay)
-        } catch (e: Exception) {
-            return "${site.label} : liste indisponible (${e.message})"
-        }
+        show(site, "${site.label} : liste des recettes…")
         val have = repo.ids()
-        val todo = urls.filter { u -> site.prefix + u.trimEnd('/').substringAfterLast('/') !in have }
-        val limit = if (perSite > 0) minOf(perSite, todo.size) else todo.size
         var added = 0
         var failed = 0
+        var left = 0
         val batch = ArrayList<Recipe>()
-        for ((i, u) in todo.take(limit).withIndex()) {
-            if (stopRequested) break
-            WebProgress.update(true, "${site.label} : ${i + 1} / $limit (${repo.count + batch.size} au total)")
+        val done = HashSet<String>()
+        fun fetch(u: String): Boolean {
+            if (stopRequested || (perSite > 0 && added + failed >= perSite)) return false
+            show(site, "${site.label} : +$added (${repo.count + batch.size} au total)")
             try {
                 val html = get(c, u)
                 val p = when (site) {
@@ -112,13 +125,38 @@ object WebRecipesSync {
             } catch (_: Exception) {
                 failed++
             }
-            // On enregistre par paquets pour voir les recettes arriver pendant le téléchargement.
-            if (batch.size >= 20) { repo.upsertAll(ArrayList(batch)); batch.clear() }
+            // Enregistrées par petits paquets : elles apparaissent dans la liste pendant le téléchargement.
+            if (batch.size >= 5) { repo.upsertAll(ArrayList(batch)); batch.clear() }
             sleep(delay)
+            return true
+        }
+        fun missing(urls: List<String>) = urls.filter { u -> done.add(u) && site.prefix + u.trimEnd('/').substringAfterLast('/') !in have }
+        try {
+            if (site == WebRecipes.Site.ANIA) {
+                val todo = missing(listUrls(c, site, delay))
+                for (u in todo) if (!fetch(u)) break
+                left = todo.size - added - failed
+            } else {
+                // Kwestia Smaku : page de liste après page de liste, ses recettes aussitôt (pas d'attente de la liste complète).
+                var page = 0
+                while (!stopRequested && page < 600) {
+                    if (perSite > 0 && added + failed >= perSite) { left = 1; break }
+                    val html = get(c, "${site.base}/przepisy" + if (page > 0) "?page=$page" else "")
+                    val found = WebRecipes.kwestiaUrls(html)
+                    if (found.isEmpty()) break
+                    sleep(delay)
+                    for (u in missing(found)) if (!fetch(u)) { left = 1; break }
+                    if (!WebRecipes.kwestiaHasNext(html, page)) break
+                    page++
+                }
+            }
+        } catch (e: Exception) {
+            if (batch.isNotEmpty()) repo.upsertAll(batch)
+            return "${site.label} : +$added, interrompu (${e.message})"
         }
         if (batch.isNotEmpty()) repo.upsertAll(batch)
-        val left = todo.size - added - failed
-        return "${site.label} : +$added" + (if (failed > 0) ", $failed illisibles" else "") + (if (left > 0) ", $left restantes" else ", complet")
+        if (stopRequested) left = maxOf(left, 1)
+        return "${site.label} : +$added" + (if (failed > 0) ", $failed illisibles" else "") + (if (left <= 0) ", complet" else if (site == WebRecipes.Site.ANIA) ", $left restantes" else ", à suivre")
     }
 
     /** Adresses de toutes les recettes du site (gardées 7 jours dans un fichier). */

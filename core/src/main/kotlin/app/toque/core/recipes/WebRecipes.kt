@@ -91,12 +91,14 @@ object WebRecipes {
         val groups = ArrayList<IngredientGroup>()
         var current = ""
         var items = ArrayList<Ingredient>()
-        val tok = Regex("post-ingredients-group-header[^>]*>(.*?)</|<span class=\"ingredient ingredient-name\">(.*?)</span>", RegexOption.DOT_MATCHES_ALL)
+        val tok = Regex("post-ingredients-group-header[^>]*>(.*?)</button>|<span class=\"ingredient ingredient-name\">(.*?)</span>", RegexOption.DOT_MATCHES_ALL)
         for (m in tok.findAll(zone)) {
             if (m.groupValues[1].isNotEmpty()) {
                 if (items.isNotEmpty()) groups += IngredientGroup(current, items)
                 items = ArrayList()
-                current = text(m.groupValues[1])
+                // L'intitulé est dans <strong> (le reste du bouton : flèche, icône d'info).
+                val head = m.groupValues[1]
+                current = text(Regex("<strong[^>]*>(.*?)</strong>", RegexOption.DOT_MATCHES_ALL).find(head)?.groupValues?.get(1) ?: head)
             } else {
                 val t = text(m.groupValues[2])
                 if (t.isNotEmpty()) items += Ingredient(name = t)
@@ -105,10 +107,32 @@ object WebRecipes {
         if (items.isNotEmpty()) groups += IngredientGroup(current, items)
         if (groups.isEmpty()) return null
 
+        // Étapes : pages récentes, blocs « Krok N : nom » (schema.org HowToStep), une photo par étape.
+        val steps = ArrayList<Step>()
+        for (blk in html.split(Regex("<div id=\"step\\d+\" class=\"step\"")).drop(1)) {
+            val b = blk.substringBefore("<hr").let { cut -> val e = cut.indexOf("recipe_end_ad"); if (e > 0) cut.substring(0, cut.lastIndexOf('<', e).coerceAtLeast(0)) else cut }
+            val name = Regex("itemprop=\"name\">(.*?)</span>", RegexOption.DOT_MATCHES_ALL).find(b)?.groupValues?.get(1)?.let { text(it) }.orEmpty()
+            val img = Regex("<img[^>]*?srcset=\"([^\"]+)\"").find(b)?.let { mid(it.groupValues[1], null) }.orEmpty()
+            val body = (b.substringAfter("class=\"step-text\"", b).substringAfter('>'))
+                .replace(Regex("<div[^>]*img-placeholder.*", RegexOption.DOT_MATCHES_ALL), "")
+                .replace(Regex("<(br|p|/p|li)[^>]*>", RegexOption.IGNORE_CASE), "\n")
+            val paras = body.split('\n').map { text(it).replace(" :", ":") }.filter { it.isNotEmpty() }
+            if (paras.isEmpty()) continue
+            steps += Step((if (name.isNotEmpty()) "$name\n" else "") + paras.joinToString("\n"), image = img)
+        }
+        if (steps.isEmpty()) aniaLooseSteps(html, steps)
+        if (steps.isEmpty()) return null
+        return aniaRecipe(html, url, title, groups, steps)
+    }
+
+    /** Anciennes pages sans blocs d'étapes : on découpe le texte de l'article. */
+    private fun aniaLooseSteps(html: String, steps: ArrayList<Step>) {
         // Étapes : la partie « przepis » de l'article, du premier intertitre après les ingrédients
         // jusqu'à la publicité de fin de recette. Photos des étapes gardées comme adresses.
         val endIng = html.indexOf("</ul>", html.lastIndexOf("ingredient-name").coerceAtLeast(0)).coerceAtLeast(0)
         var body = html.substring(endIng)
+        // Les boutons du site (« Kopiuj », « Ukryj zdjęcia ») ne sont pas des étapes.
+        body.indexOf("body_after_recipe_controls").takeIf { it > 0 }?.let { body = body.substring(it) }
         val stop = listOf("recipe_end_ad", "post-footer", "post-categories", "comments-root").map { body.indexOf(it) }.filter { it > 0 }.minOrNull()
         // On coupe avant la balise qui contient le marqueur de fin (sinon un bout de balise devient une étape).
         if (stop != null) body = body.substring(0, body.lastIndexOf('<', stop).takeIf { it >= 0 } ?: stop)
@@ -118,7 +142,6 @@ object WebRecipes {
             .replace(Regex("<script.*?</script>", RegexOption.DOT_MATCHES_ALL), "")
             .replace(Regex("<img[^>]*?srcset=\"([^\"]+)\"[^>]*>")) { "\n[[IMG:" + (mid(it.groupValues[1], null) ?: "") + "]]\n" }
             .replace(Regex("<(br|p|/p|h2|h3|/h2|/h3|li)[^>]*>", RegexOption.IGNORE_CASE), "\n")
-        val steps = ArrayList<Step>()
         var pendingImg = ""
         for (raw in body.split('\n')) {
             val img = Regex("\\[\\[IMG:([^\\]]*)]]").find(raw)?.groupValues?.get(1)
@@ -137,7 +160,9 @@ object WebRecipes {
             steps += Step(t, image = pendingImg)
             pendingImg = ""
         }
-        if (steps.isEmpty()) return null
+    }
+
+    private fun aniaRecipe(html: String, url: String, title: String, groups: List<IngredientGroup>, steps: List<Step>): Parsed {
         val intro = Regex("class=\"article-intro\"[^>]*>(.*?)</div>", RegexOption.DOT_MATCHES_ALL).find(html)?.groupValues?.get(1)?.let { text(it) }.orEmpty()
         val yieldText = meta(html, "recipeYield")
         val image = Regex("article-main-img.*?<img[^>]*src=\"([^\"]+)\"[^>]*srcset=\"([^\"]+)\"", RegexOption.DOT_MATCHES_ALL).find(html)

@@ -43,6 +43,36 @@ Rozwałkuj ciasto cienko i wykrawaj krążki szklanką.<br><em>Porada</em>: moż
         assertEquals("https://cdn/a-720.jpg", p.imageUrl)
     }
 
+    private val ania2 = """
+<h1 itemprop="name">3 bit</h1>
+<div class="post-ingredients"><section class="post-ingredients-group"><button type="button" class="ing-header post-ingredients-group-header post-ingredients-group-toggle"><span aria-hidden="true" class="post-ingredients-group-arrow"></span> <strong>Składniki na krem</strong> <span class="ing-remarks"><svg></svg></span></button>
+<ul><li><span itemprop="recipeIngredient" class="ingredient-text"><span class="ingredient ingredient-name">200 g masła</span></span></li></ul></section></div>
+<div data-read-milestone="after_ingredients"><div class="share-head">Składniki:</div><span class="btn-label">Kopiuj</span> Ukryj zdjęcia</div>
+<div data-read-milestone="body_after_recipe_controls"><h2>3 bit</h2>
+<div class="steps">
+<div id="step1" class="step" itemprop="recipeInstructions" itemscope>
+ <div class="step-name">Krok 1: <span itemprop="name">Ugotuj budyń</span></div>
+ <div class="step-text" itemprop="text"><p>Do garnka wlej mleko.<br><br>Mieszaj do wrzenia.</p>
+  <div class="img-placeholder"><img src="x" srcset="https://cdn/b-360.jpg 360w, https://cdn/b-720.jpg 720w"></div></div>
+ <hr>
+</div>
+<div id="step2" class="step" itemprop="recipeInstructions" itemscope>
+ <div class="step-name">Krok 2: <span itemprop="name">Podawaj</span></div>
+ <div class="step-text" itemprop="text"><p>Udekoruj truskawkami.</p></div>
+ <hr>
+</div></div>
+"""
+
+    @Test
+    fun parsesAniaSteps() {
+        val r = WebRecipes.ania(ania2, "https://aniagotuje.pl/przepis/3-bit")!!.recipe
+        assertEquals(listOf("Składniki na krem"), r.ingredients.map { it.title })
+        assertEquals(2, r.steps.size)
+        assertEquals("Ugotuj budyń\nDo garnka wlej mleko.\nMieszaj do wrzenia.", r.steps[0].text)
+        assertEquals("https://cdn/b-720.jpg", r.steps[0].image)
+        assertEquals("", r.steps[1].image)
+    }
+
     private val kw = """
 <h1 class="page-header">Kotlety schabowe</h1>
 <ul class="field field-name-field-przepisy"><li><a href="/przepisy/schab">Schab</a></li><li><a href="/x">Kotlety</a></li></ul>
