@@ -155,7 +155,7 @@ object WebRecipesSync {
                 }
             }
         } catch (e: Exception) {
-            app.log.write("recettes-web", "${site.label} : erreur $e" + if (e is javax.net.ssl.SSLException) " — " + CookidooClient.lastTrustIssue else "")
+            app.log.write("recettes-web", "${site.label} : erreur $e")
             if (batch.isNotEmpty()) repo.upsertAll(batch)
             return "${site.label} : +$added, interrompu (${e.message})"
         }

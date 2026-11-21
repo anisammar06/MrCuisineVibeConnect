@@ -268,51 +268,18 @@ class CookidooClient(private val context: Context) {
          * Chaîne serveur → racine embarquée : chaque signature, dates de validité, droits d'autorité (CA, keyCertSign)
          * des émetteurs, usage serveur de la feuille. Vrai seulement si la chaîne aboutit à une racine de [anchors].
          */
-        /** Dernier refus de [strictCheck] (diagnostic pour le journal). */
-        @Volatile var lastTrustIssue: String = ""
-
-        internal fun strictCheck(chain: Array<X509Certificate>, anchors: Array<X509Certificate>): Boolean = try {
-            lastTrustIssue = "chaîne " + chain.joinToString(" ← ") { it.subjectX500Principal.name.substringAfter("CN=").substringBefore(',') + "/" + it.sigAlgName }
-            if (chain.isEmpty()) false else {
-                val leaf = chain[0]
-                leaf.checkValidity()
-                val eku = leaf.extendedKeyUsage
-                if (eku != null && "1.3.6.1.5.5.7.3.1" !in eku && "2.5.29.37.0" !in eku) throw java.security.cert.CertificateException("EKU")
-                var cur = leaf
-                var ok = false
-                for (depth in 0 until 6) {
-                    // Racine embarquée qui a signé le certificat courant : fin du chemin.
-                    val anchor = anchors.firstOrNull { a ->
-                        a.subjectX500Principal == cur.issuerX500Principal && runCatching { cur.verify(a.publicKey) }.isSuccess
-                    }
-                    if (anchor != null) { anchor.checkValidity(); ok = true; break }
-                    val sameName = (chain.drop(1) + anchors).filter { it.subjectX500Principal == cur.issuerX500Principal }
-                    lastTrustIssue += " | émetteur de ${cur.subjectX500Principal.name.substringAfter("CN=").substringBefore(',')} : ${sameName.size} candidats" +
-                        sameName.joinToString("") { c -> " [" + (runCatching { cur.verify(c.publicKey); "ok" }.exceptionOrNull()?.toString()?.take(120) ?: "ok") + "]" }
-                    val issuer = chain.drop(1).firstOrNull { i ->
-                        i.subjectX500Principal == cur.issuerX500Principal && runCatching { cur.verify(i.publicKey) }.isSuccess
-                    } ?: break
-                    issuer.checkValidity()
-                    if (issuer.basicConstraints < 0) break
-                    val ku = issuer.keyUsage
-                    if (ku != null && !ku[5]) break
-                    cur = issuer
-                }
-                ok
-            }
-        } catch (e: Exception) {
-            lastTrustIssue += " | $e"
-            false
-        }
-
         fun sslFactory(c: Context): SSLSocketFactory {
             factory?.let { return it }
             val system = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply { init(null as KeyStore?) }
                 .trustManagers.filterIsInstance<X509TrustManager>().first()
             val ks = KeyStore.getInstance(KeyStore.getDefaultType()).apply { load(null, null) }
             val cf = CertificateFactory.getInstance("X.509")
-            c.assets.open("racines.pem").use { input ->
-                cf.generateCertificates(input).forEachIndexed { i, cert -> ks.setCertificateEntry("toque-$i", cert) }
+            // Bloc par bloc : sur Android 6, generateCertificates() s'arrête au premier commentaire « # … »
+            // et seule la première racine du fichier était chargée.
+            val pem = c.assets.open("racines.pem").use { String(it.readBytes(), Charsets.UTF_8) }
+            Regex("-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----", RegexOption.DOT_MATCHES_ALL).findAll(pem).forEachIndexed { i, m ->
+                val cert = cf.generateCertificate(java.io.ByteArrayInputStream(m.value.toByteArray(Charsets.US_ASCII)))
+                ks.setCertificateEntry("toque-$i", cert)
             }
             val bundled = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply { init(ks) }
                 .trustManagers.filterIsInstance<X509TrustManager>().first()
@@ -322,14 +289,7 @@ class CookidooClient(private val context: Context) {
                     try {
                         system.checkServerTrusted(chain, authType)
                     } catch (e: java.security.cert.CertificateException) {
-                        try {
-                            bundled.checkServerTrusted(chain, authType)
-                        } catch (e2: java.security.cert.CertificateException) {
-                            // Le validateur d'Android 6 refuse certaines chaînes récentes (Let's Encrypt « génération Y »,
-                            // toute en ECDSA P-384) que les navigateurs acceptent : vérification stricte faite ici,
-                            // limitée aux racines embarquées. Le nom du site reste vérifié par HttpsURLConnection.
-                            if (!strictCheck(chain, bundled.acceptedIssuers)) throw e2
-                        }
+                        bundled.checkServerTrusted(chain, authType)
                     }
                 }
                 override fun getAcceptedIssuers(): Array<X509Certificate> = system.acceptedIssuers + bundled.acceptedIssuers
