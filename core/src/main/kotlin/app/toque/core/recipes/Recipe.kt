@@ -116,6 +116,8 @@ data class Step(
     val weigh: Weigh? = null,
     /** Réglage importé non vérifié : l'utilisateur doit le confirmer avant d'exécuter. */
     val needsReview: Boolean = false,
+    /** Photo de l'étape (adresse web, chargée à l'affichage), vide si aucune. */
+    val image: String = "",
 )
 
 data class Recipe(
@@ -180,6 +182,7 @@ object RecipeCodec {
             }
             s.weigh?.let { w -> m["weigh"] = linkedMapOf("label" to w.label, "grams" to w.grams) }
             if (s.needsReview) m["needsReview"] = true
+            if (s.image.isNotBlank()) m["image"] = s.image
             m
         },
     )
@@ -212,7 +215,7 @@ object RecipeCodec {
                 val g = wm.int("grams") ?: 0
                 if (g > 0) Weigh(wm.str("label").orEmpty(), g) else null
             }
-            if (text.isEmpty() && mc == null) null else Step(text, mc, w, s.bool("needsReview") ?: false)
+            if (text.isEmpty() && mc == null) null else Step(text, mc, w, s.bool("needsReview") ?: false, s.str("image").orEmpty())
         }
         return Recipe(
             id = id,

@@ -244,6 +244,9 @@ Contexte : nous sommes le $day. Écran affiché : ${screen.ifEmpty { "accueil" }
     /** Recette complète (ingrédients et étapes) pour en parler avec la personne. */
     private fun describe(r: Recipe): String {
         val b = StringBuilder()
+        if (r.id.startsWith("ania-") || r.id.startsWith("kw-"))
+            b.append("Recette polonaise (").append(if (r.id.startsWith("ania-")) "aniagotuje.pl" else "kwestiasmaku.com")
+                .append("), texte en polonais : traduis et explique-la en français, sans programme robot ; aide pas à pas, quantités, substitutions, gestes.\n")
         b.append("Pour ${r.servings} personnes").append(if (r.totalMinutes > 0) ", ${r.totalMinutes} min au total" else "").append(".\n")
         b.append("Ingrédients : ").append(r.allIngredients.joinToString(" ; ") { it.display }).append("\n")
         b.append("Étapes :\n")

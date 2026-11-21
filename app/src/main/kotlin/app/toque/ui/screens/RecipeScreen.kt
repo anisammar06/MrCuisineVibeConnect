@@ -200,6 +200,16 @@ class RecipeScreen(a: MainActivity, val recipe: Recipe, private val repo: app.to
                 if (ok) Ui.ACCENT else Ui.WARN, if (ok) Ui.ACCENT_DIM else 0x33FFC14D, 15f))
         }
         if (chips.childCount > 0) col.addView(chips, Ui.lp(t = 8))
+        if (s.image.isNotBlank()) {
+            val pic = android.widget.ImageView(c).apply { scaleType = android.widget.ImageView.ScaleType.CENTER_CROP; adjustViewBounds = false }
+            pic.background = Ui.round(Ui.SURFACE2, 14f)
+            pic.clipToOutline = true
+            pic.outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(v: View, o: android.graphics.Outline) = o.setRoundRect(0, 0, v.width, v.height, Ui.uf(14f))
+            }
+            col.addView(pic, LinearLayout.LayoutParams(Ui.u(300), Ui.u(220)).apply { topMargin = Ui.u(10) })
+            ImageLoader.loadUrl(pic, s.image, Ui.u(300))
+        }
         row.addView(col, LinearLayout.LayoutParams(0, Ui.WRAP, 1f))
         return row
     }

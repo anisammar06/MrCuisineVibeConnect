@@ -77,7 +77,10 @@ class HomeScreen(a: MainActivity) : Screen(a) {
         rows[0].addView(t1, tileLp(true))
         rows[0].addView(tile(Icon.Kind.POT, tr("Cuisson manuelle"), tr("Temps, chaleur, vitesse")) { a.push(ManualScreen(a)) }.first, tileLp(true))
         rows[0].addView(tile(Icon.Kind.KNEAD, tr("Programmes"), tr("Pétrir, vapeur, rissoler")) { a.push(ProgramsScreen(a)) }.first, tileLp(false))
-        rows[1].addView(tile(Icon.Kind.SCALE, tr("Balance"), tr("Peser au gramme")) { a.push(ScaleScreen(a)) }.first, tileLp(true))
+        // La balance reste accessible depuis la barre du haut ; à sa place, les recettes polonaises du web.
+        val (t4, s4) = tile(Icon.Kind.BOOK, tr("Przepisy PL")) { a.push(RecipesScreen(a, web = true)) }
+        webSub = s4
+        rows[1].addView(t4, tileLp(true))
         val (t5, s5) = tile(Icon.Kind.STAR, tr("Favoris")) { a.push(RecipesScreen(a, favorites = true)) }
         favSub = s5
         rows[1].addView(t5, tileLp(true))
@@ -153,6 +156,13 @@ class HomeScreen(a: MainActivity) : Screen(a) {
             app.toque.recipes.CookidooClient(c).loggedIn -> tr("Synchro à lancer")
             else -> tr("Cookidoo à connecter")
         }
+        val wa = a.app.webAnia.count
+        val wk = a.app.webKwestia.count
+        webSub?.text = when {
+            app.toque.recipes.WebProgress.running -> app.toque.recipes.WebProgress.text
+            wa + wk > 0 -> tr("Ania %d · Kwestia %d", wa, wk)
+            else -> tr("Ania Gotuje, Kwestia Smaku")
+        }
         val shop = app.toque.kitchen.Shopping.get(c).remaining
         shopSub.text = if (shop == 0) tr("Depuis les recettes") else tr("%d à acheter", shop)
         val now = System.currentTimeMillis()
@@ -176,7 +186,10 @@ class HomeScreen(a: MainActivity) : Screen(a) {
         val u5 = a.app.tmFr.onChange { refresh() }
         val u6 = a.app.tmPl.onChange { refresh() }
         val u7 = app.toque.recipes.CookidooProgress.onChange { refresh() }
-        unsub = { u1(); u2(); u3(); u4(); u5(); u6(); u7() }
+        val u8 = a.app.webAnia.onChange { refresh() }
+        val u9 = a.app.webKwestia.onChange { refresh() }
+        val u10 = app.toque.recipes.WebProgress.onChange { refresh() }
+        unsub = { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10() }
         view.removeCallbacks(tick)
         view.postDelayed(tick, 10_000)
     }

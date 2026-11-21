@@ -406,6 +406,25 @@ class Prefs(context: Context) {
             p.edit().putString("spotifyClientSecret", v).commit()
         }
 
+    /** Recettes polonaises du web : site affiché, synchronisation de nuit. */
+    var webSite: String
+        get() = p.getString("webSite", "ania") ?: "ania"
+        set(v) {
+            p.edit().putString("webSite", v).commit()
+        }
+
+    var webAuto: Boolean
+        get() = p.getBoolean("webAuto", true)
+        set(v) {
+            p.edit().putBoolean("webAuto", v).commit()
+        }
+
+    var webResult: String
+        get() = p.getString("webResult", "") ?: ""
+        set(v) {
+            p.edit().putString("webResult", v).commit()
+        }
+
     /** Petits commentaires spontanés de l'assistant (bonjour, mises en garde, conseils). */
     var leaRemarks: Boolean
         get() = p.getBoolean("leaRemarks", true)

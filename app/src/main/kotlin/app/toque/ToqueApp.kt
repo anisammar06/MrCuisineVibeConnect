@@ -33,11 +33,17 @@ class ToqueApp : Application() {
 
     fun tm(lang: String): RecipeRepo = if (lang == "pl") tmPl else tmFr
 
+    /** Recettes polonaises du web (aniagotuje.pl, kwestiasmaku.com), consultables hors ligne. */
+    val webAnia: RecipeRepo by lazy { RecipeRepo(this, "web-ania") }
+    val webKwestia: RecipeRepo by lazy { RecipeRepo(this, "web-kwestia") }
+
+    fun web(site: String): RecipeRepo = if (site == "kwestia") webKwestia else webAnia
+
     /** Catalogue Thermomix dans la langue choisie sur son écran (bouton FR | PL). */
     val thermomix: RecipeRepo get() = tm(prefs.tmLang)
 
     /** Catalogue qui contient une recette (pour reprendre une cuisson guidée). */
-    fun repoOf(id: String): RecipeRepo = listOf(recipesFr, recipesPl, tmFr, tmPl).firstOrNull { it.get(id) != null } ?: recipes
+    fun repoOf(id: String): RecipeRepo = listOf(recipesFr, recipesPl, tmFr, tmPl, webAnia, webKwestia).firstOrNull { it.get(id) != null } ?: recipes
 
     /** Langues à synchroniser depuis monsieur-cuisine.com. */
     fun syncLangs(): List<String> = if (prefs.syncPolish) listOf("fr", "pl") else listOf("fr")

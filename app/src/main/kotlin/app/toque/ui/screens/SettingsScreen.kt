@@ -26,6 +26,8 @@ import app.toque.recipes.SyncProgress
 import app.toque.recipes.CookidooClient
 import app.toque.recipes.CookidooProgress
 import app.toque.recipes.CookidooSync
+import app.toque.recipes.WebProgress
+import app.toque.recipes.WebRecipesSync
 import app.toque.media.Received
 import app.toque.media.ReceiverService
 import app.toque.media.SpotifyService
@@ -48,6 +50,7 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
     private lateinit var port: EditText
     private lateinit var syncText: TextView
     private lateinit var tmText: TextView
+    private lateinit var webText: TextView
     private lateinit var voiceLangBox: LinearLayout
     private lateinit var voiceText: TextView
     private lateinit var voiceBtn: LinearLayout
@@ -70,6 +73,7 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
     private lateinit var tmLogin: LinearLayout
     private lateinit var tmActions: LinearLayout
     private var unsubTm: (() -> Unit)? = null
+    private var unsubWeb: (() -> Unit)? = null
     private lateinit var recvText: TextView
     private var unsubProgress: (() -> Unit)? = null
     private lateinit var bowlText: TextView
@@ -259,6 +263,24 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
             14f, Ui.TEXT3).apply { setLineSpacing(0f, 1.1f) }, Ui.lp(t = 10))
         tm.addView(tmActions)
         renderCookidoo()
+
+        // ---- Recettes polonaises du web
+        val pl = section(right, tr("Recettes polonaises (web)"), Icon.Kind.BOOK)
+        pl.addView(Ui.text(c, tr("Les recettes d'aniagotuje.pl et de kwestiasmaku.com, téléchargées avec leurs photos pour être lues sans internet (usage privé). Elles ne sont pas converties pour le robot : l'assistant vous guide pendant la préparation."),
+            15f, Ui.TEXT2).apply { setLineSpacing(0f, 1.15f) })
+        webText = Ui.text(c, "", 16f, Ui.TEXT).apply { setLineSpacing(0f, 1.15f) }
+        pl.addView(webText, Ui.lp(t = 10))
+        val wb = Ui.horizontal(c)
+        wb.addView(Ui.button(c, tr("Tout télécharger"), Ui.Style.PRIMARY, Icon.Kind.SYNC, height = 56) {
+            WebRecipesSync.start(a.applicationContext)
+            renderWeb()
+        }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 10))
+        wb.addView(Ui.button(c, tr("Arrêter"), Ui.Style.GHOST, height = 52) { WebRecipesSync.stop() })
+        pl.addView(wb, Ui.lp(t = 10))
+        pl.addView(toggle(tr("Continuer chaque nuit (300 recettes par site)"), a.prefs.webAuto) { a.prefs.webAuto = it }, Ui.lp(t = 10))
+        pl.addView(Ui.text(c, tr("Environ 2 300 recettes chez Ania et plusieurs milliers chez Kwestia Smaku. Pour ménager les sites, une page toutes les 2 s (Ania) et toutes les 10 s (Kwestia, comme le demande le site) : le tout prend plusieurs jours, la nuit."),
+            14f, Ui.TEXT3).apply { setLineSpacing(0f, 1.1f) }, Ui.lp(t = 10))
+        renderWeb()
 
         // ---- Spotify
         val sp = section(right, tr("Spotify"), Icon.Kind.PLAY)
@@ -908,6 +930,12 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         a.toast(message, Ui.WARN)
     }
 
+    private fun renderWeb() {
+        val n = tr("Ania Gotuje : %d · Kwestia Smaku : %d", a.app.webAnia.count, a.app.webKwestia.count)
+        val st = if (WebProgress.running) WebProgress.text else a.prefs.webResult
+        webText.text = if (st.isBlank()) n else n + "\n" + st
+    }
+
     override fun onShow() {
         mode = a.prefs.mode
         renderModes()
@@ -917,6 +945,7 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         unsubProgress = SyncProgress.onChange { if (SyncProgress.running) syncText.text = SyncProgress.text else if (!syncing) refreshSync() }
         if (SyncProgress.running) syncText.text = SyncProgress.text
         unsubTm = CookidooProgress.onChange { renderCookidoo() }
+        unsubWeb = WebProgress.onChange { renderWeb() }
         view.post(voiceTick)
         renderCookidoo()
     }
@@ -926,6 +955,8 @@ class SettingsScreen(a: MainActivity) : Screen(a) {
         unsubProgress = null
         unsubTm?.invoke()
         unsubTm = null
+        unsubWeb?.invoke()
+        unsubWeb = null
         view.removeCallbacks(voiceTick)
     }
 

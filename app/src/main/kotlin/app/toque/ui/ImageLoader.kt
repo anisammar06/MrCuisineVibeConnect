@@ -30,6 +30,31 @@ object ImageLoader {
         }
     }
 
+    /** Photo web (étapes des recettes polonaises), gardée en cache disque après le premier affichage. */
+    fun loadUrl(view: ImageView, url: String, targetWidth: Int) {
+        val dir = File(view.context.cacheDir, "web-img").apply { mkdirs() }
+        val f = File(dir, Integer.toHexString(url.hashCode()) + ".jpg")
+        if (f.exists()) { load(view, f, targetWidth); return }
+        view.tag = f.absolutePath
+        view.setImageDrawable(null)
+        exec.execute {
+            try {
+                val conn = java.net.URL(url).openConnection()
+                if (conn is javax.net.ssl.HttpsURLConnection) conn.sslSocketFactory = app.toque.recipes.CookidooClient.sslFactory(view.context)
+                conn.connectTimeout = 8000
+                conn.readTimeout = 10000
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 6.0) Toque")
+                val bytes = conn.getInputStream().use { it.readBytes() }
+                val tmp = File(f.path + ".tmp")
+                tmp.writeBytes(bytes)
+                tmp.renameTo(f)
+            } catch (_: Exception) {
+                return@execute
+            }
+            main.post { if (view.tag == f.absolutePath) load(view, f, targetWidth) }
+        }
+    }
+
     private fun decode(file: File, targetWidth: Int): Bitmap? = try {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, bounds)

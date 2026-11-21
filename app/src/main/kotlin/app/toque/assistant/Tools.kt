@@ -43,6 +43,7 @@ internal class Tools(private val c: Context) {
     private val app = ToqueApp.of(c)
     private val repos: List<Pair<String, RecipeRepo>> = listOf(
         "Lidl FR" to app.recipesFr, "Lidl PL" to app.recipesPl, "Thermomix FR" to app.tmFr, "Thermomix PL" to app.tmPl,
+        "Ania Gotuje" to app.webAnia, "Kwestia Smaku" to app.webKwestia,
     )
 
     fun run(name: String, input: Map<String, Any?>): String = Json.write(when (name) {
@@ -99,7 +100,7 @@ internal class Tools(private val c: Context) {
             "id" to r.id, "title" to r.title, "source" to label, "servings" to r.servings,
             "total_minutes" to r.totalMinutes, "prep_minutes" to r.prepMinutes, "difficulty" to r.difficulty,
             "ingredients" to r.allIngredients.map { it.display },
-            "steps" to r.steps.mapIndexed { i, s -> "${i + 1}. ${s.text.take(240)}" + (s.machine?.let { " [${it.summary}]" } ?: "") }.take(30),
+            "steps" to r.steps.mapIndexed { i, s -> "${i + 1}. ${s.text.take(if (r.id.startsWith("ania-") || r.id.startsWith("kw-")) 700 else 240)}" + (s.machine?.let { " [${it.summary}]" } ?: "") }.take(30),
             "notes" to r.notes.take(400),
         )
     }
@@ -149,6 +150,7 @@ internal class Tools(private val c: Context) {
                 "recipes" -> RecipesScreen(a)
                 "favorites" -> RecipesScreen(a, favorites = true)
                 "thermomix_recipes" -> RecipesScreen(a, thermomix = true)
+                "polish_recipes" -> RecipesScreen(a, web = true)
                 "cookidoo_search" -> CookidooSearchScreen(a, input.str("query").orEmpty())
                 "shopping_list" -> ShoppingScreen(a)
                 "timers" -> TimersScreen(a)
@@ -320,7 +322,7 @@ internal class Tools(private val c: Context) {
                 "query" to p("string", "mots-clés, ex. « poulet curry », « soupe », « dessert chocolat » ; en polonais pour les recettes PL"),
                 "max_minutes" to p("integer", "durée totale maximale"),
                 "favorites_only" to p("boolean", "seulement les favoris de la famille"),
-                "source" to p("string", "filtre : « Lidl », « Thermomix », « FR » ou « PL »"),
+                "source" to p("string", "filtre : « Lidl », « Thermomix », « FR », « PL », « Ania » ou « Kwestia » (recettes polonaises d'aniagotuje.pl et kwestiasmaku.com, en polonais : traduis-les)"),
                 "limit" to p("integer", "nombre de résultats (8 par défaut)"),
             )),
             tool("recipes_with_ingredients", "Recettes réalisables avec des ingrédients donnés (« j'ai des courgettes et du riz »).", mapOf(
@@ -332,7 +334,7 @@ internal class Tools(private val c: Context) {
             )),
             tool("open_recipe", "Ouvre une recette à l'écran du robot (la personne lance ensuite la cuisson elle-même).", mapOf("id" to p("string", "id de la recette")), listOf("id")),
             tool("open_screen", "Ouvre un écran de l'appli du robot : accueil, retour, recettes, favoris, recettes Thermomix, recherche Cookidoo, liste de courses, minuteurs, cuisson manuelle, programmes, balance, médias, Spotify, réglages, ou la cuisson guidée de la recette affichée.", mapOf(
-                "screen" to p("string", "écran", mapOf("enum" to listOf("home", "back", "recipes", "favorites", "thermomix_recipes", "cookidoo_search",
+                "screen" to p("string", "écran", mapOf("enum" to listOf("home", "back", "recipes", "favorites", "thermomix_recipes", "polish_recipes", "cookidoo_search",
                     "shopping_list", "timers", "manual_cooking", "programs", "scale", "media", "spotify", "spotify_library", "settings", "guided_cooking"))),
                 "query" to p("string", "texte de recherche (cookidoo_search)"),
             ), listOf("screen")),

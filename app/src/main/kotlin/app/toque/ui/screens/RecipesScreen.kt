@@ -21,6 +21,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import app.toque.Prefs
 import app.toque.recipes.CookidooClient
+import app.toque.recipes.WebProgress
+import app.toque.recipes.WebRecipesSync
 import app.toque.core.i18n.I18n
 import app.toque.core.i18n.tr
 import app.toque.core.recipes.RecipeFilter
@@ -40,15 +42,18 @@ class RecipesScreen(
     a: MainActivity, private val focusSearch: Boolean = false, favorites: Boolean = false,
     /** Catalogue Thermomix (Cookidoo converti) au lieu des recettes Lidl. */
     private val thermomix: Boolean = false,
+    /** Recettes polonaises téléchargées depuis aniagotuje.pl et kwestiasmaku.com (onglet par site). */
+    private val web: Boolean = false,
 ) : Screen(a) {
-    override val title = if (thermomix) tr("Recettes Thermomix") else if (favorites) tr("Favoris") else tr("Recettes")
+    override val title = if (web) tr("Przepisy – recettes polonaises") else if (thermomix) tr("Recettes Thermomix") else if (favorites) tr("Favoris") else tr("Recettes")
 
-    private val repo get() = if (thermomix) a.app.thermomix else a.app.recipes
+    private val repo get() = if (web) a.app.web(a.prefs.webSite) else if (thermomix) a.app.thermomix else a.app.recipes
     private var lang: String
-        get() = if (thermomix) a.prefs.tmLang else a.prefs.recipeLang
+        get() = if (web) a.prefs.webSite else if (thermomix) a.prefs.tmLang else a.prefs.recipeLang
         set(v) {
-            if (thermomix) a.prefs.tmLang = v else a.prefs.recipeLang = v
+            if (web) a.prefs.webSite = v else if (thermomix) a.prefs.tmLang = v else a.prefs.recipeLang = v
         }
+    private var unsubWeb: (() -> Unit)? = null
 
     private var filter = RecipeFilter(favoritesOnly = favorites)
     private var query = ""
@@ -106,6 +111,12 @@ class RecipesScreen(
         langBox = Ui.horizontal(c)
         bar.addView(langBox, Ui.lp(Ui.WRAP, Ui.WRAP, l = 14))
         buildLang()
+        if (web) {
+            bar.addView(Ui.button(c, tr("Télécharger"), Ui.Style.SECONDARY, Icon.Kind.SYNC, height = 56, textSize = 17f) {
+                if (WebRecipesSync.busy) { WebRecipesSync.stop(); a.toast(tr("Téléchargement arrêté")) }
+                else { WebRecipesSync.start(a.applicationContext); a.toast(tr("Téléchargement des recettes lancé")) }
+            }, Ui.lp(Ui.WRAP, Ui.WRAP, l = 12))
+        }
         if (thermomix) {
             bar.addView(Ui.button(c, tr("Cookidoo"), Ui.Style.PRIMARY, Icon.Kind.SEARCH, height = 56, textSize = 17f) {
                 a.push(CookidooSearchScreen(a, input.text.toString().trim()))
@@ -155,7 +166,8 @@ class RecipesScreen(
     private fun buildLang() {
         langBox.removeAllViews()
         val current = lang
-        for ((code, label) in listOf("fr" to "FR", "pl" to "PL")) {
+        val tabs = if (web) listOf("ania" to "Ania Gotuje", "kwestia" to "Kwestia Smaku") else listOf("fr" to "FR", "pl" to "PL")
+        for ((code, label) in tabs) {
             langBox.addView(Ui.toggleChip(c, label, current == code) { switchLang(code) }, Ui.lp(Ui.WRAP, Ui.WRAP, r = 6))
         }
     }
@@ -205,7 +217,10 @@ class RecipesScreen(
         val none = repo.loaded && repo.count == 0
         count.text = if (results.isEmpty()) "" else if (results.size == 1) tr("1 recette") else tr("%d recettes", results.size)
         empty.visibility = if (results.isEmpty() && repo.loaded) View.VISIBLE else View.GONE
+        if (web && WebProgress.running && results.isEmpty()) count.text = WebProgress.text
         emptyText.text = when {
+            none && web -> if (WebProgress.running) tr("Téléchargement en cours : %s", WebProgress.text)
+                else tr("Les recettes de ce site ne sont pas encore sur le robot.\nTouchez « Télécharger » : elles arrivent peu à peu (une toutes les 2 à 10 secondes, pour ménager le site).")
             none && thermomix && !CookidooClient(c).loggedIn ->
                 tr("Connectez votre compte Cookidoo : Réglages › Recettes Thermomix.\nLes recettes de vos listes Cookidoo arrivent en premier.")
             none && thermomix -> tr("Les recettes Thermomix arrivent à la prochaine synchronisation.\nTouchez « Cookidoo » pour en chercher et en importer tout de suite.")
@@ -226,6 +241,7 @@ class RecipesScreen(
         buildChips()
         search()
         unsub = repo.onChange { buildChips(); search() }
+        if (web) unsubWeb = WebProgress.onChange { refreshEmpty() }
         if (focusSearch) view.postDelayed({
             input.requestFocus()
             (c.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
@@ -234,6 +250,8 @@ class RecipesScreen(
 
     override fun onHide() {
         unsub?.invoke()
+        unsubWeb?.invoke()
+        unsubWeb = null
     }
 
     override fun onKnob(delta: Int): Boolean {

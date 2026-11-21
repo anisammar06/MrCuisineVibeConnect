@@ -21,6 +21,7 @@ import app.toque.core.recipes.Recipe
 import app.toque.core.recipes.StepProgram
 import app.toque.kitchen.Cooked
 import app.toque.ui.HoldButton
+import app.toque.ui.ImageLoader
 import app.toque.ui.MotorView
 import app.toque.ui.WeighGauge
 import app.toque.assistant.Remarks
@@ -63,6 +64,7 @@ class CookScreen(a: MainActivity, val recipe: Recipe, startStep: Int) : Screen(a
     private lateinit var gauge: WeighGauge
     private var motor: MotorView? = null
     private lateinit var ingRow: LinearLayout
+    private lateinit var stepPic: android.widget.ImageView
     /** Ce qu'on pèse en ce moment (cible de l'étape, ou ingrédient choisi) ; null : balance seule. */
     private var weighTarget: Weigh? = null
     private var scaleOpen = false
@@ -83,7 +85,17 @@ class CookScreen(a: MainActivity, val recipe: Recipe, startStep: Int) : Screen(a
         counter = Ui.text(c, "", 17f, Ui.TEXT2, Ui.MEDIUM).apply { letterSpacing = 0.06f }
         left.addView(counter)
         text = Ui.text(c, "", 31f, Ui.TEXT, Ui.LIGHT).apply { setLineSpacing(0f, 1.18f) }
-        left.addView(Ui.scroll(c, text), LinearLayout.LayoutParams(Ui.MATCH, 0, 1f).apply { topMargin = Ui.u(12) })
+        // Texte de l'étape, et sa photo quand la recette en a (recettes polonaises du web).
+        val textCol = Ui.vertical(c)
+        textCol.addView(text)
+        stepPic = android.widget.ImageView(c).apply { scaleType = android.widget.ImageView.ScaleType.CENTER_CROP }
+        stepPic.background = Ui.round(Ui.SURFACE2, 16f)
+        stepPic.clipToOutline = true
+        stepPic.outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(v: View, o: android.graphics.Outline) = o.setRoundRect(0, 0, v.width, v.height, Ui.uf(16f))
+        }
+        textCol.addView(stepPic, LinearLayout.LayoutParams(Ui.u(360), Ui.u(240)).apply { topMargin = Ui.u(12) })
+        left.addView(Ui.scroll(c, textCol), LinearLayout.LayoutParams(Ui.MATCH, 0, 1f).apply { topMargin = Ui.u(12) })
         // Ingrédients cités dans l'étape, et la balance à portée de main.
         ingRow = Ui.horizontal(c, Gravity.CENTER_VERTICAL)
         left.addView(android.widget.HorizontalScrollView(c).apply {
@@ -174,6 +186,8 @@ class CookScreen(a: MainActivity, val recipe: Recipe, startStep: Int) : Screen(a
         val step = recipe.steps[index]
         counter.text = tr("ÉTAPE %d SUR %d", index + 1, n)
         text.text = step.text.ifBlank { step.machine?.summary ?: "" }
+        stepPic.visibility = if (step.image.isNotBlank()) View.VISIBLE else View.GONE
+        if (step.image.isNotBlank()) ImageLoader.loadUrl(stepPic, step.image, Ui.u(360))
         val found = StepIngredients.match(step.text, recipe.allIngredients)
         val firstGrams = found.firstOrNull { StepIngredients.grams(it) != null }
         weighTarget = step.weigh ?: firstGrams?.let { Weigh(it.name, StepIngredients.grams(it)!!) }

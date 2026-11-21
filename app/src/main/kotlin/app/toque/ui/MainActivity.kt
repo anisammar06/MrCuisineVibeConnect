@@ -104,6 +104,8 @@ class MainActivity : Activity() {
         app.recipesPl.load()
         app.tmFr.load()
         app.tmPl.load()
+        app.webAnia.load()
+        app.webKwestia.load()
         // Après la mise à jour qui range les recettes Cookidoo par langue : resynchro automatique.
         if (prefs.cookidooSchema < 2 && CookidooClient(this).loggedIn) {
             Thread { CookidooSync.run(applicationContext) }.start()

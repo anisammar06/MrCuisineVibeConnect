@@ -23,6 +23,8 @@ class SyncService : IntentService("toque-synchro") {
         // Puis Cookidoo : listes du compte et un lot de nouvelles recettes Thermomix.
         if (app.prefs.cookidooAuto && CookidooClient(this).loggedIn &&
             System.currentTimeMillis() - app.prefs.cookidooLastMs >= 6 * 3600_000L) CookidooSync.run(this)
+        // Enfin les recettes polonaises du web, par lots (le site demande 10 s entre deux pages).
+        if (app.prefs.webAuto) WebRecipesSync.run(this, perSite = 300)
     }
 
     companion object {
