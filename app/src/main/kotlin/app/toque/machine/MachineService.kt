@@ -130,7 +130,7 @@ class MachineService : Service() {
         val b = s.rxHex.split(' ')
         if (b.size < 27) return
         val st = (b[3].toIntOrNull(16) ?: return) and 0xF0
-        val flags = "statut=%02X ext=%s b24=%s b25=%s".format(st, b[4], b[24], b[25])
+        val flags = "statut=%02X ext=%s b24=%s".format(st, b[4], b[24])
         if (flags != lastFlags) {
             if (lastFlags.isNotEmpty()) log.write("base", "$lastFlags → $flags (temp ${s.actualTempC} °C, ${s.weightG} g)")
             lastFlags = flags

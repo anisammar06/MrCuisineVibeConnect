@@ -15,8 +15,8 @@ android {
         targetSdk = 28
         // Pour publier une mise à jour : augmenter les deux valeurs puis pousser sur GitHub
         // (la version est publiée automatiquement, voir .github/workflows/release.yml).
-        versionCode = 38
-        versionName = "0.20.0"
+        versionCode = 39
+        versionName = "0.20.1"
         // Le robot est un ARMv7 : inutile d'embarquer les bibliothèques natives des autres processeurs.
         ndk { abiFilters += "armeabi-v7a" }
     }
